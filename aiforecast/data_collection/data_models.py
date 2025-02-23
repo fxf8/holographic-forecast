@@ -1,9 +1,9 @@
 from collections.abc import Generator, Iterator
 from typing import ClassVar, Self
 from dataclasses import dataclass
-from enum import Enum
 import datetime
 import math
+import json
 
 KM_PER_MILE: float = 1.60934
 
@@ -48,8 +48,8 @@ class GeographicCordinate:
 @dataclass
 class WeatherUnit:
     name: str
-    unit: str
-    description: str | None
+    unit: str | None = None
+    description: str | None = None
 
 
 @dataclass
@@ -85,3 +85,7 @@ class WeatherSpanArea:
 
     def __iter__(self) -> Iterator[WeatherTimeArea]:
         return iter(self.data)
+
+    @classmethod
+    def from_openmeteo_json(cls, json_response: str, unit_set: set[WeatherUnit]):
+        pass
