@@ -1,6 +1,8 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from typing import ClassVar, Self
 from dataclasses import dataclass
+from enum import Enum
+import datetime
 import math
 
 KM_PER_MILE: float = 1.60934
@@ -43,10 +45,43 @@ class GeographicCordinate:
                 )
 
 
-class A:
-    def __init__(self, x: float, y: float):
-        self.x: float = x
-        self.y: float = y
+@dataclass
+class WeatherUnit:
+    name: str
+    unit: str
+    description: str | None
 
-    def up_one(self) -> Self:
-        return type(self)(self.x, self.y + 1)
+
+@dataclass
+class WeatherTimePoint:
+    """
+    Weather data at a certain time and certain location
+    """
+
+    time: datetime.datetime
+    cordinate: GeographicCordinate
+    data: list[tuple[WeatherUnit, float]]
+
+
+@dataclass
+class WeatherTimeArea:
+    """
+    Weather at a certain time in multiple points (an area)
+    """
+
+    data: list[WeatherTimePoint]
+
+    def __iter__(self) -> Iterator[WeatherTimePoint]:
+        return iter(self.data)
+
+
+@dataclass
+class WeatherSpanArea:
+    """
+    Weather over a span of time in multiple points (an area)
+    """
+
+    data: list[WeatherTimeArea]
+
+    def __iter__(self) -> Iterator[WeatherTimeArea]:
+        return iter(self.data)
