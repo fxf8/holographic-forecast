@@ -3,7 +3,6 @@ from typing import ClassVar, Self, cast
 from dataclasses import dataclass
 import datetime
 import math
-import json
 
 KM_PER_MILE: float = 1.60934
 
@@ -103,14 +102,14 @@ class WeatherSpanArea:
     @classmethod
     def from_openmeteo_json(
         cls,
-        json_responses: list[str],
+        json_responses: list[OpenMeteoResponseJSON],
         expected_weather_quantities: Sequence[WeatherQuantity] | None = None,
     ) -> Self:
         """
         Creates a WeatherSpanArea from a JSON response from OpenMeteo
 
         Args:
-            json_responses (list[str]): JSON responses from OpenMeteo, each from a different location
+            json_responses (list[Any]): A list of JSON responses from OpenMeteo, each from a different location
             expected_weather_quantities (Sequence[WeatherQuantity] | None): Set of quantities to *EXPECT* and extract from the json response. Can be used to remove unintended quantities, specify order for quantities, and error for expected quanitities not provided. Defaults to None which returns all quantities in the response in lexicographical order.
 
         Returns:
@@ -120,7 +119,7 @@ class WeatherSpanArea:
         if len(json_responses) == 0:
             return cls([])
 
-        first_response: OpenMeteoResponseJSON = json.loads(json_responses[0])
+        first_response: OpenMeteoResponseJSON = json_responses[0]
 
         # Quantities only referes to the *NAME* of the quantity, not the value
         hourly_quantities_in_response: list[WeatherQuantity] = [
@@ -167,23 +166,22 @@ class WeatherSpanArea:
         )
 
         for json_response in json_responses:
-            parsed_json_response: OpenMeteoResponseJSON = json.loads(json_response)
-            latitude: float = cast(float, parsed_json_response["latitude"])
-            longitude: float = cast(float, parsed_json_response["longitude"])
+            latitude: float = cast(float, json_response["latitude"])
+            longitude: float = cast(float, json_response["longitude"])
 
             timezone = datetime.timezone(
-                name=cast(str, parsed_json_response["timezone"]),
+                name=cast(str, json_response["timezone"]),
                 offset=datetime.timedelta(
-                    seconds=cast(int, parsed_json_response["utc_offset_seconds"])
+                    seconds=cast(int, json_response["utc_offset_seconds"])
                 ),
             )
 
             hourly_data: OpenMeteoResponseValues = cast(
-                OpenMeteoResponseValues, parsed_json_response["hourly"]
+                OpenMeteoResponseValues, json_response["hourly"]
             )
 
             daily_data: OpenMeteoResponseValues = cast(
-                OpenMeteoResponseValues, parsed_json_response["daily"]
+                OpenMeteoResponseValues, json_response["daily"]
             )
 
             for time_index, time in hourly_times_ordered:
