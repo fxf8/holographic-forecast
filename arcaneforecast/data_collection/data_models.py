@@ -7,7 +7,7 @@ import math
 KM_PER_MILE: float = 1.60934
 
 
-def drange(start: float, stop: float, step: float = 1.0):
+def drange(start: float, stop: float, step: float = 1.0) -> Generator[float]:
     while start < stop:
         yield float(start)
         start += step
