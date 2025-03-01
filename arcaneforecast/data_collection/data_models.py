@@ -31,7 +31,7 @@ class GeographicCordinate:
         )
 
         for y_axis_degrees_delta in drange(
-            radius_degrees, -radius_degrees, distance_between_points_degrees
+            -radius_degrees, radius_degrees, distance_between_points_degrees
         ):
             width: float = math.sqrt(radius_degrees**2 - y_axis_degrees_delta**2)
 
