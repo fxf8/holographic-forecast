@@ -1,4 +1,5 @@
-from datetime import datetime
+import datetime
+import json
 
 import arcaneforecast.data_collection.data_models as data_models
 import arcaneforecast.data_collection.openmeteo_data_collection as odc
@@ -9,12 +10,14 @@ def test_collection_all_parameters():
         latitude_deg=36.1716, longitude_deg=115.1391
     )
 
-    points: list[data_models.GeographicCordinate] = [
-        *center.points_within_radius(radius_miles=100, distance_between_points_miles=50)
-    ]
+    # points: list[data_models.GeographicCordinate] = [
+    #    *center.points_within_radius(radius_miles=100, distance_between_points_miles=75)
+    # ]
 
-    start_date = datetime(2021, 1, 1)
-    end_date = datetime(2021, 2, 1)
+    points: list[data_models.GeographicCordinate] = [center]
+
+    start_date = datetime.date(2021, 1, 1)
+    end_date = datetime.date(2021, 1, 4)
 
     print(
         f"{center = }\n"
@@ -27,12 +30,18 @@ def test_collection_all_parameters():
         list_of_points=points,
         start_date=start_date,
         end_date=end_date,
-        hourly_parameters=odc.OPEN_METEO_HOURLY_PARAMETERS,
-        daily_parameters=odc.OPEN_METEO_DAILY_PARAMETERS,
+        hourly_parameters=odc.OPEN_METEO_HOURLY_PARAMETERS[0:2],
+        daily_parameters=odc.OPEN_METEO_DAILY_PARAMETERS[0:2],
     )
 
     responses = data_collector.get()
 
+    print(f"{len(responses) = }")
+
+    print(f"{responses[0].json() = }")
+
+    with open("example/open-meteo/open-meteo-4-param-response.json", "w") as f:
+        json.dump(responses[0].json(), f)
 
 if __name__ == "__main__":
     test_collection_all_parameters()
