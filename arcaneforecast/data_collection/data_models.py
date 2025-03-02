@@ -45,7 +45,7 @@ class GeographicCordinate:
 
 
 OpenMeteoResponseQuantities = dict[str, str]
-OpenMeteoResponseValues = dict[str, dict[int, str | float]]
+OpenMeteoResponseValues = dict[str, list[str | float]]
 OpenMeteoResponseJSON = dict[
     str, float | int | str | OpenMeteoResponseQuantities | OpenMeteoResponseValues
 ]
@@ -151,18 +151,14 @@ class WeatherSpanArea:
                 + f"Expected: {set(expected_weather_quantities)}, Received: {set(quantities_in_response)}"
             )
 
-        hourly_times: dict[int, str] = cast(
-            dict[int, str],
+        hourly_times: list[str] = cast(
+            list[str],
             cast(OpenMeteoResponseValues, first_response["daily"])["time"],
-        )
-
-        hourly_times_ordered: list[tuple[int, str]] = sorted(
-            hourly_times.items(), key=lambda time: time[0]
         )
 
         # Currently empty data. Filled later
         weather_span_area: WeatherSpanArea = cls(
-            data=[WeatherTimeArea([]) for _ in range(len(hourly_times_ordered))]
+            data=[WeatherTimeArea([]) for _ in range(len(hourly_times))]
         )
 
         for json_response in json_responses:
@@ -184,10 +180,12 @@ class WeatherSpanArea:
                 OpenMeteoResponseValues, json_response["daily"]
             )
 
-            for time_index, time in hourly_times_ordered:
+            for time_index, hourly_time in enumerate(hourly_times):
                 weather_span_area.data[time_index].data.append(
                     WeatherTimePoint(
-                        time=datetime.datetime.fromisoformat(time).astimezone(timezone),
+                        time=datetime.datetime.fromisoformat(hourly_time).astimezone(
+                            timezone
+                        ),
                         cordinate=GeographicCordinate(
                             latitude_deg=latitude, longitude_deg=longitude
                         ),
@@ -195,7 +193,7 @@ class WeatherSpanArea:
                             (
                                 expected_weather_quantity,
                                 hourly_data[expected_weather_quantity.name][time_index]
-                                if expected_weather_quantity in hourly_data
+                                if expected_weather_quantity.name in hourly_data
                                 else daily_data[expected_weather_quantity.name][
                                     time_index // 24
                                 ],

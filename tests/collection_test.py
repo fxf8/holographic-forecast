@@ -17,7 +17,7 @@ def test_collection_all_parameters():
     points: list[data_models.GeographicCordinate] = [center]
 
     start_date = datetime.date(2021, 1, 1)
-    end_date = datetime.date(2021, 1, 4)
+    end_date = datetime.date(2021, 1, 2)
 
     print(
         f"{center = }\n"
@@ -40,7 +40,7 @@ def test_collection_all_parameters():
 
     print(f"{responses[0].json() = }")
 
-    with open("example/open-meteo/open-meteo-4-param-response.json", "w") as f:
+    with open("example/open-meteo/open-meteo-4-param-response-2-day.json", "w") as f:
         json.dump(responses[0].json(), f)
 
 if __name__ == "__main__":
