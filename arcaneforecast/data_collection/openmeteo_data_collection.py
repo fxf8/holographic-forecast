@@ -37,7 +37,7 @@ class OpenMeteoPointDataCollector:
                 map(lambda parameter: parameter.name, self.hourly_parameters)
             ),
             "daily": ",".join(
-                map(lambda parameter: parameter.name, self.hourly_parameters)
+                map(lambda parameter: parameter.name, self.daily_parameters)
             ),
         }
 
