@@ -1,8 +1,12 @@
-from collections.abc import Generator, Iterator, Sequence
-from typing import ClassVar, Self, cast
-from dataclasses import dataclass
 import datetime
 import math
+
+from collections.abc import Callable, Generator, Iterator, Sequence
+from typing import ClassVar, Self, cast
+from dataclasses import dataclass
+
+import numpy as np
+import numpy.typing as npt
 
 KM_PER_MILE: float = 1.60934
 
@@ -65,6 +69,30 @@ class WeatherTimePoint:
     time: datetime.datetime
     cordinate: GeographicCordinate
     data: Sequence[tuple[WeatherQuantity, float | str]]
+
+    def embed(
+        self,
+        ordering: list[WeatherQuantity] | None = None,
+        parameter_to_float: dict[WeatherQuantity, Callable[[float | str], np.float32]]
+        | None = None,
+    ) -> npt.NDArray[np.float32]:
+        if ordering is None:
+            ordering = [item[0] for item in self.data]
+
+        if parameter_to_float is None:
+            parameter_to_float = {}
+
+        # Only use parameter_to_float when its weather quantity exists.
+        # If its a string, use `float`
+
+        return np.array(
+            [
+                parameter_to_float.get(item[0], float)(item[1])
+                if item[0] in ordering
+                else (float(item[1]) if isinstance(item[1], str) else item[1])
+                for item in self.data
+            ]
+        )
 
 
 @dataclass
