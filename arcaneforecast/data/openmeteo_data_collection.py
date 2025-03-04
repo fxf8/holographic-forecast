@@ -1,11 +1,9 @@
 import datetime
 from dataclasses import dataclass
-from typing import Any
-from collections.abc import Generator
 
 import requests
 
-import arcaneforecast.data_collection.data_models as data_models
+import arcaneforecast.data.data_models as data_models
 
 OPEN_METEO_HISTORICAL_ENDPOINT: str = "https://archive-api.open-meteo.com/v1/archive"
 

@@ -6,8 +6,8 @@ import json
 
 from typing import cast
 
-import arcaneforecast.data_collection.data_models as data_models
-import arcaneforecast.data_collection.openmeteo_data_collection as odc
+import arcaneforecast.data.data_models as data_models
+import arcaneforecast.data.openmeteo_data_collection as odc
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,6 @@ def test_data_model_json_parsing():
         parsed_data = data_models.WeatherSpanArea.from_openmeteo_json(
             json_responses=json_responses,
         )
-
 
         logger.info("Done parsing data. Data info:\n" + f"{len(parsed_data.data) = }\n")
 
