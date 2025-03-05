@@ -1,12 +1,16 @@
 import datetime
 import math
 
-from collections.abc import Callable, Generator, Iterator, Sequence
+from collections.abc import (
+    Collection,
+    Generator,
+    Iterator,
+    Mapping,
+    MutableSequence,
+    Sequence,
+)
 from typing import ClassVar, Self, cast
 from dataclasses import dataclass
-
-import numpy as np
-import numpy.typing as npt
 
 KM_PER_MILE: float = 1.60934
 
@@ -48,9 +52,9 @@ class GeographicCordinate:
                 )
 
 
-OpenMeteoResponseQuantities = dict[str, str]
-OpenMeteoResponseValues = dict[str, list[str | float]]
-OpenMeteoResponseJSON = dict[
+OpenMeteoResponseQuantities = Mapping[str, str]
+OpenMeteoResponseValues = Mapping[str, Sequence[str | float]]
+OpenMeteoResponseJSON = Mapping[
     str, float | int | str | OpenMeteoResponseQuantities | OpenMeteoResponseValues
 ]
 
@@ -68,31 +72,8 @@ class WeatherTimePoint:
 
     time: datetime.datetime
     cordinate: GeographicCordinate
-    data: Sequence[tuple[WeatherQuantity, float | str]]
-
-    def embed(
-        self,
-        ordering: list[WeatherQuantity] | None = None,
-        parameter_to_float: dict[WeatherQuantity, Callable[[float | str], np.float32]]
-        | None = None,
-    ) -> npt.NDArray[np.float32]:
-        if ordering is None:
-            ordering = [item[0] for item in self.data]
-
-        if parameter_to_float is None:
-            parameter_to_float = {}
-
-        # Only use parameter_to_float when its weather quantity exists.
-        # If its a string, use `float`
-
-        return np.array(
-            [
-                parameter_to_float.get(item[0], float)(item[1])
-                if item[0] in ordering
-                else (float(item[1]) if isinstance(item[1], str) else item[1])
-                for item in self.data
-            ]
-        )
+    elevation_meters: float
+    data: Collection[tuple[WeatherQuantity, float | str]]
 
 
 @dataclass
@@ -101,10 +82,13 @@ class WeatherTimeArea:
     Weather at a certain time in multiple points (an area)
     """
 
-    data: list[WeatherTimePoint]
+    data: MutableSequence[WeatherTimePoint]
 
     def __iter__(self) -> Iterator[WeatherTimePoint]:
         return iter(self.data)
+
+    def geographic_points(self) -> Generator[GeographicCordinate]:
+        return (weather_time_point.cordinate for weather_time_point in self.data)
 
 
 # Create an exception for missing quanitity
@@ -122,7 +106,7 @@ class WeatherSpanArea:
     Weather over a span of time in multiple points (an area)
     """
 
-    data: list[WeatherTimeArea]
+    data: Sequence[WeatherTimeArea]
 
     def __iter__(self) -> Iterator[WeatherTimeArea]:
         return iter(self.data)
@@ -130,14 +114,14 @@ class WeatherSpanArea:
     @classmethod
     def from_openmeteo_json(
         cls,
-        json_responses: list[OpenMeteoResponseJSON],
+        json_responses: Collection[OpenMeteoResponseJSON],
         expected_weather_quantities: Sequence[WeatherQuantity] | None = None,
     ) -> Self:
         """
         Creates a WeatherSpanArea from a JSON response from OpenMeteo
 
         Args:
-            json_responses (list[Any]): A list of JSON responses from OpenMeteo, each from a different location
+            json_responses (Collection[Any]): A Collection of JSON responses from OpenMeteo, each from a different location
             expected_weather_quantities (Sequence[WeatherQuantity] | None): Set of quantities to *EXPECT* and extract from the json response. Can be used to remove unintended quantities, specify order for quantities, and error for expected quanitities not provided. Defaults to None which returns all quantities in the response in lexicographical order.
 
         Returns:
@@ -147,24 +131,24 @@ class WeatherSpanArea:
         if len(json_responses) == 0:
             return cls([])
 
-        first_response: OpenMeteoResponseJSON = json_responses[0]
+        example_response: OpenMeteoResponseJSON = next(iter(json_responses))
 
         # Quantities only referes to the *NAME* of the quantity, not the value
-        hourly_quantities_in_response: list[WeatherQuantity] = [
+        hourly_quantities_in_response: Collection[WeatherQuantity] = [
             WeatherQuantity(quantity_name)
             for quantity_name in cast(
-                OpenMeteoResponseQuantities, first_response["hourly_units"]
+                OpenMeteoResponseQuantities, example_response["hourly_units"]
             ).keys()
         ]
 
-        daily_quantities_in_response: list[WeatherQuantity] = [
+        daily_quantities_in_response: Collection[WeatherQuantity] = [
             WeatherQuantity(quantity_name)
             for quantity_name in cast(
-                OpenMeteoResponseQuantities, first_response["daily_units"]
+                OpenMeteoResponseQuantities, example_response["daily_units"]
             ).keys()
         ]
 
-        quantities_in_response: list[WeatherQuantity] = (
+        quantities_in_response: Collection[WeatherQuantity] = (
             hourly_quantities_in_response + daily_quantities_in_response
         )
 
@@ -179,9 +163,9 @@ class WeatherSpanArea:
                 + f"Expected: {set(expected_weather_quantities)}, Received: {set(quantities_in_response)}"
             )
 
-        hourly_times: list[str] = cast(
-            list[str],
-            cast(OpenMeteoResponseValues, first_response["daily"])["time"],
+        hourly_times: Sequence[str] = cast(
+            Sequence[str],
+            cast(OpenMeteoResponseValues, example_response["daily"])["time"],
         )
 
         # Currently empty data. Filled later
@@ -199,6 +183,8 @@ class WeatherSpanArea:
                     seconds=cast(int, json_response["utc_offset_seconds"])
                 ),
             )
+
+            elevation: float = cast(float, json_response["elevation"])
 
             hourly_data: OpenMeteoResponseValues = cast(
                 OpenMeteoResponseValues, json_response["hourly"]
@@ -228,7 +214,18 @@ class WeatherSpanArea:
                             )
                             for expected_weather_quantity in expected_weather_quantities
                         ],
+                        elevation_meters=elevation,
                     )
                 )
 
         return weather_span_area
+
+    def geographic_points(self) -> Generator[GeographicCordinate] | None:
+        """
+        Returns None of the WeatherSpanArea is empty, otherwise returns a generator of all the geographic points in the WeatherSpanArea
+        """
+
+        if len(self.data) == 0:
+            return None
+
+        return self.data[0].geographic_points()
