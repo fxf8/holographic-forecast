@@ -1,5 +1,6 @@
 import datetime
 from dataclasses import dataclass
+from collections.abc import Collection, Mapping
 
 import requests
 
@@ -25,7 +26,7 @@ class OpenMeteoPointDataCollector:
     daily_parameters: list[data_models.WeatherQuantity]
 
     def prepare_request(self) -> requests.PreparedRequest:
-        parameters: dict[str, str] = {
+        parameters: Mapping[str, str] = {
             "latitude": f"{self.position.latitude_deg:.10f}",
             "longitude": f"{self.position.latitude_deg:.10f}",
             "start_date": self.start_date.isoformat(),
