@@ -1,8 +1,8 @@
 import datetime
 import json
 
-import holographic_forecast.data_collection.data_models as data_models
-import holographic_forecast.data_collection.openmeteo_data_collection as odc
+import holographic_forecast.data.data_models as data_models
+import holographic_forecast.data.openmeteo_data_collection as odc
 
 
 def test_collection_all_parameters():
@@ -42,6 +42,7 @@ def test_collection_all_parameters():
 
     with open("example/open-meteo/open-meteo-4-param-response-2-day.json", "w") as f:
         json.dump(responses[0].json(), f)
+
 
 if __name__ == "__main__":
     test_collection_all_parameters()
