@@ -59,7 +59,7 @@ OpenMeteoResponseJSON = Mapping[
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class WeatherQuantity:
     name: str
 

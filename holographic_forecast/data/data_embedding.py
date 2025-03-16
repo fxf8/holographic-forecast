@@ -2,7 +2,7 @@
 # pyright: reportUnknownMemberType=false
 
 from collections.abc import Collection, Sequence, Generator, Mapping
-from typing import Callable, cast
+from typing import Callable, cast, SupportsFloat
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,27 +20,59 @@ class WeatherTimePointEmbedder:
         self,
         ordering: Sequence[data_models.WeatherQuantity] | None = None,
         parameter_to_float: Mapping[
-            data_models.WeatherQuantity, Callable[[float | str], np.float32]
+            data_models.WeatherQuantity, Callable[[float | str], SupportsFloat]
         ]
         | None = None,
     ) -> npt.NDArray[np.float32]:
-        if ordering is None:
-            ordering = [item[0] for item in self.weather_time_point.data]
-
         if parameter_to_float is None:
             parameter_to_float = {}
 
         # Only use parameter_to_float when its weather quantity exists.
         # If its a string, use `float`
+        if ordering is None:
+            return np.array(
+                [
+                    parameter_to_float.get(item[0], float)(item[1])
+                    for item in self.weather_time_point.data
+                    if not isinstance(item[1], str)
+                ]
+            )
 
-        return np.array(  # index represents data in point at a time
-            [
-                parameter_to_float.get(item[0], float)(item[1])
-                if item[0] in ordering
-                else (float(item[1]) if isinstance(item[1], str) else item[1])
-                for item in self.weather_time_point.data
-            ]
-        )
+        embedded_data: Sequence[SupportsFloat] = []
+
+        existing_data: Sequence[tuple[data_models.WeatherQuantity, float | str]] = [
+            *self.weather_time_point.data
+        ]
+
+        existing_quantities_and_index: Mapping[data_models.WeatherQuantity, int] = {
+            quantity[0]: index
+            for index, quantity in enumerate(self.weather_time_point.data)
+            if quantity in existing_data
+        }
+
+        for expected_weather_quantity in ordering:
+            if expected_weather_quantity not in self.weather_time_point.data:
+                raise ValueError(
+                    f"Expected to find quantity {expected_weather_quantity} in data, but did not."
+                )
+
+            value: str | float = existing_data[
+                existing_quantities_and_index[expected_weather_quantity]
+            ][1]
+
+            if (
+                isinstance(value, str)
+                and expected_weather_quantity not in parameter_to_float
+            ):
+                raise ValueError(
+                    f"Expected to find parameter_to_float for quantity {expected_weather_quantity}, but did not."
+                )
+
+            embedded_data.append(
+                parameter_to_float.get(expected_weather_quantity, float)(value)
+            )
+
+        return np.array(embedded_data)
 
     def embed_geographic_data(self) -> npt.NDArray[np.float32]:
         return np.array(
@@ -72,7 +104,8 @@ class WeatherTimePointEmbedder:
                         predicted_cordinate.longitude_deg,
                     ]
                 ),
-            ]
+            ],
+            dtype=np.float32,
         )
 
 
