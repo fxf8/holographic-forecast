@@ -4,7 +4,7 @@
 import tensorflow as tf
 import keras
 
-import arcaneforecast.data.data_models as data_models
+import holographic_forecast.data.data_models as data_models
 
 
 class WeatherModelV1(keras.Model):

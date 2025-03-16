@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 import tensorflow as tf
 
-import arcaneforecast.data.data_models as data_models
+import holographic_forecast.data.data_models as data_models
 
 
 @dataclass

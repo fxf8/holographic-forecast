@@ -1,8 +1,8 @@
 import datetime
 import json
 
-import arcaneforecast.data_collection.data_models as data_models
-import arcaneforecast.data_collection.openmeteo_data_collection as odc
+import holographic_forecast.data_collection.data_models as data_models
+import holographic_forecast.data_collection.openmeteo_data_collection as odc
 
 
 def test_collection_all_parameters():

@@ -4,7 +4,7 @@ from collections.abc import Collection, Mapping
 
 import requests
 
-import arcaneforecast.data.data_models as data_models
+import holographic_forecast.data.data_models as data_models
 
 OPEN_METEO_HISTORICAL_ENDPOINT: str = "https://archive-api.open-meteo.com/v1/archive"
 

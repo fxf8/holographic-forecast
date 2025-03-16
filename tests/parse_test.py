@@ -6,8 +6,8 @@ import json
 
 from typing import cast
 
-import arcaneforecast.data.data_models as data_models
-import arcaneforecast.data.openmeteo_data_collection as odc
+import holographic_forecast.data.data_models as data_models
+import holographic_forecast.data.openmeteo_data_collection as odc
 
 
 logger = logging.getLogger(__name__)
