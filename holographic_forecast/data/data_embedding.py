@@ -179,6 +179,9 @@ class WeatherSpanAreaEmbedder:
             predicted_cordinate (data_models.GeographicCordinate | Colection[data_models.GeographicCordinate] | None): The cordinate to predict the weather for. If None, all points in the area will be placed in parallel in the batch. If a collection, each cordinate will be placed in parallel in the batch.
             ordering (Sequence[data_models.WeatherQuantity]): The ordering of the weather quantities.
             parameter_to_float (dict[data_models.WeatherQuantity, Callable[[float | str], np.float32]]): The function to convert the weather quantity to float.
+
+        Returns:
+            Collection[tf.Tensor]: The embedded tensor. Axis: (timesteps, n_points_per_area, n_features)
         """
 
         if len(self.weather_span_area.data) == 0:
