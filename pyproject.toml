@@ -16,3 +16,6 @@ dependencies = [
 
 [tool.basedpyright]
 reportExplicitAny = false
+
+[dependency-groups]
+dev = []
