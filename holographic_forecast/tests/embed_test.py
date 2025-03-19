@@ -11,7 +11,7 @@ logging.basicConfig(
     level=logging.INFO,
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("embedding-test.log"),
+        logging.FileHandler("logs/embedding-test.log"),
     ],
 )
 

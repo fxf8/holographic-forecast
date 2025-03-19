@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "debugpy>=1.8.12",
-    "ipython>=9.0.1",
     "keras>=3.8.0",
     "numpy>=2.0.2",
     "pyright>=1.1.396",
@@ -18,4 +17,6 @@ dependencies = [
 reportExplicitAny = false
 
 [dependency-groups]
-dev = []
+dev = [
+    "ipython>=9.0.2",
+]

@@ -9,7 +9,7 @@ import holographic_forecast.data.openmeteo_data_collection as odc
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("collection-test.log")],
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("logs/collection-test.log")],
 )
 
 

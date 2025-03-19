@@ -15,7 +15,7 @@ import holographic_forecast.tests.collection_test as collection_test
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("parse-test.log")],
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("logs/parse-test.log")],
 )
 
 
