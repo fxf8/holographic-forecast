@@ -15,7 +15,7 @@ logging.basicConfig(
 
 def collect_data_sample(center: data_models.GeographicCordinate):
     points: list[data_models.GeographicCordinate] = [
-        *center.points_within_radius(radius_miles=100, distance_between_points_miles=75)
+        *center.points_within_radius_grid(radius_miles=100, distance_between_points_miles=75)
     ]
 
     logger.info(f"{len(points) = }")

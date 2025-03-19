@@ -24,10 +24,11 @@ def drange(start: float, stop: float, step: float = 1.0) -> Generator[float]:
 @dataclass
 class GeographicCordinate:
     MILES_PER_LATITUDE_DEGREE: ClassVar[float] = 69.0
+    LATITUDE_DEGREES_PER_MILE: ClassVar[float] = 1 / MILES_PER_LATITUDE_DEGREE
     latitude_deg: float  # x axis (relative)
     longitude_deg: float  # y axis (relative)
 
-    def points_within_radius(
+    def points_within_radius_grid(
         self, radius_miles: float, distance_between_points_miles: float
     ) -> Generator[Self]:
         radius_degrees: float = (
@@ -49,6 +50,45 @@ class GeographicCordinate:
                 yield type(self)(
                     self.latitude_deg + x_axis_degrees_delta,
                     self.longitude_deg + y_axis_degrees_delta,
+                )
+
+    def points_within_radius_radial_lines(
+        self,
+        radial_lines_count: int,
+        radius_miles: float,
+        distance_between_first_point_miles: float,
+    ) -> Generator[Self]:
+        """
+        Calculates points on radial lines. Points on each line progressively become farther still within the radius
+        """
+
+        tau: float = math.pi * 2
+        angle_step = tau / radial_lines_count
+
+        # Calculating stop
+        # distance_between_first_point * (point_number**2) < radius_miles
+        # point_number < math.sqrt(radius / distance_between_first_point)
+
+        distances_from_center_miles: list[float] = [
+            distance_between_first_point_miles * (point_number**2)
+            for point_number in range(
+                1,  # start
+                int(
+                    math.sqrt(radius_miles / distance_between_first_point_miles)
+                ),  # stop
+                1,  # step
+            )
+        ]
+
+        for distance_from_center_miles in distances_from_center_miles:
+            for angle in drange(0, tau - angle_step / 2, angle_step):
+                yield type(self)(
+                    math.cos(angle)
+                    * distance_from_center_miles
+                    * GeographicCordinate.LATITUDE_DEGREES_PER_MILE,
+                    math.sin(angle)
+                    * distance_from_center_miles
+                    * GeographicCordinate.LATITUDE_DEGREES_PER_MILE,
                 )
 
 
