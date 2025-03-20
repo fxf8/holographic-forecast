@@ -24,26 +24,27 @@ class WeatherModelV1(keras.Model):
     def __init__(
         self,
         n_features: int,
-        n_reduced_features_points: int | None,
-        n_reduced_features_timesteps: int | None,
+        n_reduced_features_points: int | None = None,
+        n_reduced_features_timesteps: int | None = None,
     ):
         super().__init__()
         self.n_features: int = n_features
 
         # Shape: (n_features, n_features_1)
-        self.point_reduction_kernel: keras.Variable = keras.Variable(
-            initializer=np.random.random(
-                (
-                    n_features,
-                    n_reduced_features_points
-                    if n_reduced_features_points is not None
-                    else n_features,
-                )
-            )
+        self.point_reduction_kernel: keras.Variable = self.add_weight(
+            shape=(
+                n_features,
+                n_reduced_features_points
+                if n_reduced_features_points is not None
+                else n_features,
+            ),
+            trainable=True,
         )
 
         self.timesteps_reduction_gru: keras.layers.GRU = keras.layers.GRU(
-            n_reduced_features_timesteps
+            n_features
+            if n_reduced_features_timesteps is None
+            else n_reduced_features_timesteps
         )
 
         self.dense_layer: keras.layers.Dense = keras.layers.Dense(n_features, "softmax")

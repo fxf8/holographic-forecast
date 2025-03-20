@@ -75,7 +75,7 @@ class GeographicCordinate:
                 1,  # start
                 int(
                     math.sqrt(radius_miles / distance_between_first_point_miles)
-                ),  # stop
+                ) + 1,  # stop
                 1,  # step
             )
         ]

@@ -9,13 +9,38 @@ import holographic_forecast.data.openmeteo_data_collection as odc
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("logs/collection-test.log")],
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("logs/collection-test.log"),
+    ],
 )
+
+
+def generate_points_radial():
+    las_vegas: data_models.GeographicCordinate = data_models.GeographicCordinate(
+        latitude_deg=36.1716, longitude_deg=-115.1391
+    )
+
+    # log location
+
+    logger.info(f"Generating data sample for: {las_vegas}")
+
+    points: list[data_models.GeographicCordinate] = [
+        *las_vegas.points_within_radius_radial_lines(
+            radial_lines_count=5,
+            radius_miles=100,
+            distance_between_first_point_miles=50,
+        )
+    ]
+
+    logger.info(f"{len(points) = }")
 
 
 def collect_data_sample(center: data_models.GeographicCordinate):
     points: list[data_models.GeographicCordinate] = [
-        *center.points_within_radius_grid(radius_miles=100, distance_between_points_miles=75)
+        *center.points_within_radius_grid(
+            radius_miles=100, distance_between_points_miles=75
+        )
     ]
 
     logger.info(f"{len(points) = }")
@@ -52,4 +77,4 @@ def test_collection_all_parameters():
 
 
 if __name__ == "__main__":
-    test_collection_all_parameters()
+    generate_points_radial()

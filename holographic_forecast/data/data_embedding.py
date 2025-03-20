@@ -34,7 +34,7 @@ class WeatherTimePointEmbedder:
                 [
                     parameter_to_float.get(item[0], float)(item[1])
                     for item in self.weather_time_point.data
-                    if not isinstance(item[1], str)
+                    if not isinstance(item[1], str | None)
                 ]
             )
 
@@ -171,7 +171,7 @@ class WeatherSpanAreaEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
         ]
         | None = None,
-    ) -> Collection[tf.Tensor]:  # Tensor shape (timesteps, n_points, n_features)
+    ) -> tf.Tensor:  # Tensor shape (batch_size, timesteps, n_points, n_features)
         """
         Embeds the tensor input for the weather prediction model.
 
@@ -181,7 +181,7 @@ class WeatherSpanAreaEmbedder:
             parameter_to_float (dict[data_models.WeatherQuantity, Callable[[float | str], np.float32]]): The function to convert the weather quantity to float.
 
         Returns:
-            Collection[tf.Tensor]: The embedded tensor. Axis: (timesteps, n_points_per_area, n_features)
+            tf.Tensor: The embedded tensor. Axis: (batch_size, timesteps, n_points_per_area, n_features) Each batch is a different cordinate within the cordinates within the area whose data is provided
         """
 
         if len(self.weather_span_area.data) == 0:
@@ -198,20 +198,16 @@ class WeatherSpanAreaEmbedder:
                 )
             ]
 
-        return [
-            tf.convert_to_tensor(
-                np.array(
-                    [
-                        WeatherTimeAreaEmbedder(
-                            weather_time_area
-                        ).embed_to_numpy_2D_array(
-                            predicted_cordinate=predicted_cordinate,
-                            ordering=ordering,
-                            parameter_to_float=parameter_to_float,
-                        )
-                        for weather_time_area in self.weather_span_area
-                    ]
-                )
-            )
-            for predicted_cordinate in predicted_cordinates
-        ]
+        return tf.convert_to_tensor(
+            [
+                [
+                    WeatherTimeAreaEmbedder(weather_time_area).embed_to_numpy_2D_array(
+                        predicted_cordinate=predicted_cordinate,
+                        ordering=ordering,
+                        parameter_to_float=parameter_to_float,
+                    )
+                    for weather_time_area in self.weather_span_area
+                ]
+                for predicted_cordinate in predicted_cordinates
+            ]
+        )
