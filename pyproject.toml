@@ -16,7 +16,11 @@ dependencies = [
 [tool.basedpyright]
 reportExplicitAny = false
 
+[tool.ruff.format]
+indent-style = "tab"
+
 [dependency-groups]
 dev = [
     "ipython>=9.0.2",
+    "reindent>=3.5.1",
 ]
