@@ -6,6 +6,11 @@ import sys
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.openmeteo_data_collection as odc
 
+# NOTES:
+
+# JSON file size:
+# 
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,

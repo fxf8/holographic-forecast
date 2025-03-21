@@ -10,6 +10,7 @@ import os
 from typing import cast
 
 import tensorflow as tf
+import keras
 import requests
 
 import holographic_forecast.data.data_models as data_models
@@ -90,27 +91,29 @@ def generate_data_sample() -> data_models.WeatherSpanArea:
         )
 
 
-def test_prediction_model():
-    """
-    Simply tests whether or not the model is functional. Does not include training or accuracy
-    """
-
+def embedded_data_sample() -> tf.Tensor:
     data = generate_data_sample()
     logging.info(f"{data = }")
 
     # Shape (batch_size, timesteps, n_points, n_features)
-    embedded_data: tf.Tensor = data_embedding.WeatherSpanAreaEmbedder(
-        data
-    ).embed_model_input()
+    return data_embedding.WeatherSpanAreaEmbedder(data).embed_model_input()
+
+
+def test_prediction_model(model_type: type):
+    """
+    Simply tests whether or not the model is functional. Does not include training or accuracy
+    """
+
+    embedded_data: tf.Tensor = embedded_data_sample()
 
     n_features: int = cast(int, embedded_data.shape[-1])
 
-    prediction_model_v1 = weather_models.WeatherModelV1(n_features=n_features)
+    prediction_model_v1: keras.Model = model_type(n_features=n_features)
 
     predictions: tf.Tensor = cast(tf.Tensor, prediction_model_v1(embedded_data))
 
-    logger.info(f"{predictions = }")
+    logger.info(f"{predictions.shape = }")
 
 
 if __name__ == "__main__":
-    test_prediction_model()
+    test_prediction_model(weather_models.WeatherModelV1)
