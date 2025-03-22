@@ -6,10 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "debugpy>=1.8.12",
+    "intervaltree>=3.1.0",
     "keras>=3.8.0",
     "numpy>=2.0.2",
     "pyright>=1.1.396",
-    "python-intervals>=1.10.0.post1",
     "requests>=2.32.3",
     "tensorflow>=2.18.0",
 ]
