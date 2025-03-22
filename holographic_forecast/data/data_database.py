@@ -2,8 +2,6 @@ from typing import Self, cast
 from dataclasses import dataclass
 import pickle
 
-import intervals
-
 import holographic_forecast.data.data_models as data_models
 
 # All the different kinds of data objects

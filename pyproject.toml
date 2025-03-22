@@ -9,7 +9,6 @@ dependencies = [
     "keras>=3.8.0",
     "numpy>=2.0.2",
     "pyright>=1.1.396",
-    "python-intervals>=1.10.0.post1",
     "requests>=2.32.3",
     "tensorflow>=2.18.0",
 ]
