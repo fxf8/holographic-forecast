@@ -1,7 +1,7 @@
 # pyright: reportMissingTypeStubs=false
 # pyright: reportUnknownMemberType=false
 
-from typing import Self, cast, ClassVar
+from typing import Self, cast
 from collections.abc import Generator, Sequence, Collection
 from dataclasses import dataclass
 import pickle
@@ -26,10 +26,6 @@ def first_element_[T](sequence: Sequence[T]) -> T:
 # Database for weather data from OpenMeteo
 @dataclass
 class WeatherDatabaseOpenMeteo:
-	# Used for intervals to avoid floating point inaccuracy errors.
-	# Epsilon is subtracted from the lower bounds and Epsilon / 2 is subtracted from the upper bounds
-	EPSILON: ClassVar[float] = 1e-2
-
 	"""
 	Entriy keys are dependent on the latitude, longitude, and degrees per index.
 	Entries within the same 'grid' decided by the degrees per index will be elemnts of a list.
@@ -58,6 +54,10 @@ class WeatherDatabaseOpenMeteo:
 		]
 	]
 
+	degrees_per_index: float = (
+		data_models.GeographicCordinate.LATITUDE_DEGREES_PER_MILE * 5
+	)
+
 	def __post_init__(self):
 		self.entry_grid_squares = []
 
@@ -66,6 +66,17 @@ class WeatherDatabaseOpenMeteo:
 			for entry_grid_longitude_index in entry_grid_square[1]:
 				for weather_time_point in entry_grid_longitude_index[1][0]:
 					yield weather_time_point
+
+	def degree_to_index(self, degrees: float) -> int:
+		return int(degrees / self.degrees_per_index)
+
+	def cordinate_to_index_pair(
+		self, cordinate: data_models.GeographicCordinate
+	) -> tuple[int, int]:
+		return (
+			self.degree_to_index(cordinate.latitude_deg),
+			self.degree_to_index(cordinate.longitude_deg),
+		)
 
 	def _latitude_index_to_array_index(self, latitude_index: int) -> int | None:
 		index = bisect.bisect_left(
@@ -82,32 +93,32 @@ class WeatherDatabaseOpenMeteo:
 
 	def _cordinate_indices_to_array_indices(
 		self, latitude_index: int, longitude_index: int
-	) -> int | None:
+	) -> tuple[int, int] | None:
 		latitude_array_index: int | None = self._latitude_index_to_array_index(
 			latitude_index
 		)
 		if latitude_array_index is None:
 			return None
 
-		index = bisect.bisect_left(
+		longitude_array_index = bisect.bisect_left(
 			self.entry_grid_squares[latitude_array_index][1],
 			longitude_index,
 			key=lambda entry: entry[0],
 		)
 
 		if (
-			index != len(self.entry_grid_squares[latitude_array_index][1])
-			and self.entry_grid_squares[latitude_array_index][1][index][0]
+			longitude_array_index
+			!= len(self.entry_grid_squares[latitude_array_index][1])
+			and self.entry_grid_squares[latitude_array_index][1][longitude_array_index][
+				0
+			]
 			== longitude_index
 		):
-			return index
+			return (latitude_array_index, longitude_array_index)
 
 		return None
 
 	# Each index in the entries dictionary is a range of degrees of latitude and longitude. Default is 5 miles
-	degrees_per_index: float = (
-		data_models.GeographicCordinate.LATITUDE_DEGREES_PER_MILE * 5
-	)
 
 	def save(self, filename: str):
 		with open(filename, "wb") as f:
@@ -133,8 +144,8 @@ class WeatherDatabaseOpenMeteo:
 
 		# Ensure that the entry grid square exists
 		if not (
-			entry_array_latitude_index := self._cordinate_indices_to_array_indices(
-				index_latitude, index_longitude
+			entry_array_latitude_index := self._latitude_index_to_array_index(
+				index_latitude
 			)
 		):
 			self.entry_grid_squares.append((index_latitude, []))
@@ -229,3 +240,114 @@ class WeatherDatabaseOpenMeteo:
 		)
 
 		self.register_weather_span_area(collector.get())
+
+	def entry_from_cordinate(
+		self, cordinate: data_models.GeographicCordinate
+	) -> tuple[list[data_models.WeatherTimePoint], P.Interval] | None:
+		index_latitude: int = int(cordinate.latitude_deg / self.degrees_per_index)
+		index_longitude: int = int(cordinate.longitude_deg / self.degrees_per_index)
+
+		array_index_pair: tuple[int, int] | None = (
+			self._cordinate_indices_to_array_indices(index_latitude, index_longitude)
+		)
+
+		if array_index_pair is None:
+			return None
+
+		latitude_array_index, longitude_array_index = array_index_pair
+
+		return (
+			self.entry_grid_squares[latitude_array_index][1][longitude_array_index][1][
+				0
+			],
+			self.entry_grid_squares[latitude_array_index][1][longitude_array_index][1][
+				1
+			],
+		)
+
+	# Gets data from the database rather than pulling from openmeteo
+	def database_weather_span_area(
+		self,
+		cordinates: data_models.GeographicCordinate
+		| Collection[data_models.GeographicCordinate],
+		start_datetime: datetime.datetime,
+		end_datetime: datetime.datetime,
+		pull_missing_data: bool = True,
+		*,
+		hourly_parameters: Sequence[data_models.WeatherQuantity] | None = None,
+		daily_parameters: Sequence[data_models.WeatherQuantity] | None = None,
+	) -> data_models.WeatherSpanArea:
+		if hourly_parameters is None:
+			hourly_parameters = openmeteo.OPEN_METEO_HOURLY_PARAMETERS
+
+		if daily_parameters is None:
+			daily_parameters = openmeteo.OPEN_METEO_DAILY_PARAMETERS
+
+		if not isinstance(cordinates, Collection):
+			cordinates = [cordinates]
+
+		existing_entries_from_cordinates: list[
+			tuple[list[data_models.WeatherTimePoint], P.Interval] | None
+		] = [
+			(
+				entry
+				if (entry := self.entry_from_cordinate(cordinate)) is not None
+				else None
+			)
+			for cordinate in cordinates
+		]
+
+		expected_time_interval: P.Interval = P.closedopen(
+			start_datetime, end_datetime + datetime.timedelta(hours=1)
+		)
+
+		missing_data_cordinates: list[data_models.GeographicCordinate] = [
+			cordinate
+			for cordinate, entry in zip(cordinates, existing_entries_from_cordinates)
+			if entry is None or expected_time_interval not in entry[1]
+		]
+
+		if pull_missing_data:
+			self.pull_data(
+				cordinates=missing_data_cordinates,
+				start_datetime=start_datetime,
+				end_datetime=end_datetime,
+				hourly_parameters=hourly_parameters,
+				daily_parameters=daily_parameters,
+			)
+
+		# Dimensionality: (point, timesteps)
+		selected_entries: list[list[data_models.WeatherTimePoint]] = []
+
+		for cordinate in cordinates:
+			# entry: tuple[list[data_models.WeatherTimePoint], P.Interval] = cast( tuple[list[data_models.WeatherTimePoint], P.Interval], self.entry_from_cordinate(cordinate),)
+
+			entry: tuple[list[data_models.WeatherTimePoint], P.Interval] | None = (
+				self.entry_from_cordinate(cordinate)
+			)
+
+			if entry is None:
+				raise ValueError(f"Could not find entry for cordinate {cordinate}")
+
+			entry_start_slice: int = bisect.bisect_left(
+				entry[0], start_datetime, key=lambda entry_element: entry_element.time
+			)
+			entry_end_slice: int = bisect.bisect_right(
+				entry[0], end_datetime, key=lambda entry_element: entry_element.time
+			)
+
+			selected_entries.append(entry[0][entry_start_slice:entry_end_slice])
+
+		# Dimensionality of zip(*selected_entries): (timesteps, points)
+
+		return data_models.WeatherSpanArea(
+			[  # WeatherTimeArea
+				data_models.WeatherTimeArea(
+					[  # WeatherTimePoint
+						point
+						for point in cast(Sequence[data_models.WeatherTimePoint], area)
+					]
+				)
+				for area in zip(*selected_entries)  # Iterates over timesteps
+			]
+		)
