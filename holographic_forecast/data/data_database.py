@@ -2,7 +2,7 @@
 # pyright: reportUnknownMemberType=false
 
 from typing import Self, cast
-from collections.abc import Generator, Sequence, Collection
+from collections.abc import Callable, Generator, Sequence, Collection
 from dataclasses import dataclass
 import pickle
 import bisect
@@ -266,14 +266,13 @@ class WeatherDatabaseOpenMeteo:
 		)
 
 	# Gets data from the database rather than pulling from openmeteo
-	def database_weather_span_area(
+	def database_get_weather_span_area(
 		self,
 		cordinates: data_models.GeographicCordinate
 		| Collection[data_models.GeographicCordinate],
 		start_datetime: datetime.datetime,
 		end_datetime: datetime.datetime,
 		pull_missing_data: bool = True,
-		*,
 		hourly_parameters: Sequence[data_models.WeatherQuantity] | None = None,
 		daily_parameters: Sequence[data_models.WeatherQuantity] | None = None,
 	) -> data_models.WeatherSpanArea:
@@ -286,28 +285,35 @@ class WeatherDatabaseOpenMeteo:
 		if not isinstance(cordinates, Collection):
 			cordinates = [cordinates]
 
+		def existing_entries_from_cordinates_lambda() -> list[
+			tuple[list[data_models.WeatherTimePoint], P.Interval] | None
+		]:
+			return [
+				(
+					entry
+					if (entry := self.entry_from_cordinate(cordinate)) is not None
+					else None
+				)
+				for cordinate in cordinates
+			]
+
 		existing_entries_from_cordinates: list[
 			tuple[list[data_models.WeatherTimePoint], P.Interval] | None
-		] = [
-			(
-				entry
-				if (entry := self.entry_from_cordinate(cordinate)) is not None
-				else None
-			)
-			for cordinate in cordinates
-		]
-
-		expected_time_interval: P.Interval = P.closedopen(
-			start_datetime, end_datetime + datetime.timedelta(hours=1)
-		)
-
-		missing_data_cordinates: list[data_models.GeographicCordinate] = [
-			cordinate
-			for cordinate, entry in zip(cordinates, existing_entries_from_cordinates)
-			if entry is None or expected_time_interval not in entry[1]
-		]
+		] = existing_entries_from_cordinates_lambda()
 
 		if pull_missing_data:
+			expected_time_interval: P.Interval = P.closedopen(
+				start_datetime, end_datetime + datetime.timedelta(hours=1)
+			)
+
+			missing_data_cordinates: list[data_models.GeographicCordinate] = [
+				cordinate
+				for cordinate, entry in zip(
+					cordinates, existing_entries_from_cordinates
+				)
+				if entry is None or expected_time_interval not in entry[1]
+			]
+
 			self.pull_data(
 				cordinates=missing_data_cordinates,
 				start_datetime=start_datetime,
@@ -316,7 +322,9 @@ class WeatherDatabaseOpenMeteo:
 				daily_parameters=daily_parameters,
 			)
 
-		# Dimensionality: (point, timesteps)
+			existing_entries_from_cordinates = existing_entries_from_cordinates_lambda()
+
+		"""
 		selected_entries: list[list[data_models.WeatherTimePoint]] = []
 
 		for cordinate in cordinates:
@@ -351,3 +359,31 @@ class WeatherDatabaseOpenMeteo:
 				for area in zip(*selected_entries)  # Iterates over timesteps
 			]
 		)
+		"""
+
+		weather_span_area: data_models.WeatherSpanArea = data_models.WeatherSpanArea(
+			data=[]
+		)
+
+		date_iterator: datetime.datetime = start_datetime
+
+		while date_iterator < end_datetime:
+			weather_time_area: data_models.WeatherTimeArea = (
+				data_models.WeatherTimeArea(data=[])
+			)
+
+			for entry in existing_entries_from_cordinates:
+				if entry is None or date_iterator not in entry[1]:
+					continue
+
+				entry_array_index: int = bisect.bisect_left(
+					entry[0],
+					date_iterator,
+					key=lambda entry_element: entry_element.time,
+				)
+
+				weather_time_area.data.append(entry[0][entry_array_index])
+
+			date_iterator += datetime.timedelta(hours=1)
+
+		return weather_span_area

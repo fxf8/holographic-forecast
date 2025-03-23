@@ -142,10 +142,10 @@ class MissingQuantityException(Exception):
 @dataclass
 class WeatherSpanArea:
 	"""
-	Weather over a span of time in multiple points (an area)
+	Weather over a span of time in multiple points (an area). Each index is one hour apart
 	"""
 
-	data: Sequence[WeatherTimeArea]
+	data: MutableSequence[WeatherTimeArea]
 
 	def __iter__(self) -> Iterator[WeatherTimeArea]:
 		return iter(self.data)
