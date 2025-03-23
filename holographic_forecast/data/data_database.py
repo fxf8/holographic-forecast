@@ -2,13 +2,13 @@
 # pyright: reportUnknownMemberType=false
 
 from typing import Self, cast, ClassVar
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Sequence, Collection
 from dataclasses import dataclass
 import pickle
 import bisect
 import datetime
 
-import intervaltree
+import portion as P
 
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.openmeteo_data_collection as openmeteo
@@ -43,7 +43,6 @@ class WeatherDatabaseOpenMeteo:
 		- 'entry_array_latitude_index' and 'entry_array_longitude_index' are the indexes for the literal array
 	"""
 
-
 	entry_grid_squares: list[
 		tuple[
 			int,  # latitude index
@@ -51,7 +50,8 @@ class WeatherDatabaseOpenMeteo:
 				tuple[
 					int,  # longitude index
 					tuple[  # longitude entries
-						list[data_models.WeatherTimePoint], intervaltree.IntervalTree
+						# Interval represents datetimes which exist
+						list[data_models.WeatherTimePoint], P.Interval
 					],
 				]
 			],
@@ -67,7 +67,7 @@ class WeatherDatabaseOpenMeteo:
 				for weather_time_point in entry_grid_longitude_index[1][0]:
 					yield weather_time_point
 
-	def latitude_index_to_array_index(self, latitude_index: int) -> int | None:
+	def _latitude_index_to_array_index(self, latitude_index: int) -> int | None:
 		index = bisect.bisect_left(
 			self.entry_grid_squares, latitude_index, key=first_element_
 		)
@@ -80,10 +80,10 @@ class WeatherDatabaseOpenMeteo:
 
 		return None
 
-	def cordinate_indices_to_array_index(
+	def _cordinate_indices_to_array_indices(
 		self, latitude_index: int, longitude_index: int
 	) -> int | None:
-		latitude_array_index: int | None = self.latitude_index_to_array_index(
+		latitude_array_index: int | None = self._latitude_index_to_array_index(
 			latitude_index
 		)
 		if latitude_array_index is None:
@@ -103,12 +103,6 @@ class WeatherDatabaseOpenMeteo:
 			return index
 
 		return None
-
-	def insert_
-
-	@staticmethod
-	def datetime_to_unix_hours(datetime: datetime.datetime) -> float:
-		return datetime.timestamp() // 3600
 
 	# Each index in the entries dictionary is a range of degrees of latitude and longitude. Default is 5 miles
 	degrees_per_index: float = (
@@ -137,17 +131,14 @@ class WeatherDatabaseOpenMeteo:
 			weather_time_point.cordinate.longitude_deg / self.degrees_per_index
 		)
 
-		unix_datetime_hours: float = WeatherDatabaseOpenMeteo.datetime_to_unix_hours(
-			weather_time_point.time
-		)
-
 		# Ensure that the entry grid square exists
 		if not (
-			entry_array_latitude_index := self.cordinate_indices_to_array_index(
+			entry_array_latitude_index := self._cordinate_indices_to_array_indices(
 				index_latitude, index_longitude
 			)
 		):
 			self.entry_grid_squares.append((index_latitude, []))
+			entry_array_latitude_index = 0
 
 		if not (
 			entry_array_longitude_index := bisect.bisect_left(
@@ -158,34 +149,26 @@ class WeatherDatabaseOpenMeteo:
 		):
 			self.entry_grid_squares[index_latitude][1].insert(
 				entry_array_longitude_index,
-				(index_longitude, ([], intervaltree.IntervalTree())),
+				(index_longitude, ([], P.empty())),
 			)
 
-		entries_list, interval_tree = self.entry_grid_squares[
+		entries_list, existing_interval = self.entry_grid_squares[
 			entry_array_latitude_index
 		][1][entry_array_longitude_index][1]
 
-		if not overwrite and unix_datetime_hours in interval_tree:
+		if not overwrite and weather_time_point.time in existing_interval:
 			return
 
-		interval_tree.addi(
-			unix_datetime_hours - self.EPSILON,
-			unix_datetime_hours + self.EPSILON,
-			weather_time_point,
+		existing_interval |= P.closedopen(
+			weather_time_point.time,
+			weather_time_point.time + datetime.timedelta(hours=1),
 		)
-
-		interval_tree.merge_overlaps()
 
 		bisect.insort(
 			entries_list,
 			weather_time_point,
 			key=lambda weather_time_point: weather_time_point.time,
 		)
-
-		# Make sure to insert at the chronologically correct time in the correct entries list
-
-		# The 'interval' element of the tuple represents the time interval which exists in the database.
-		# The time is represented using hours since epoch
 
 	def register_weather_time_area(
 		self, weather_time_area: data_models.WeatherTimeArea
@@ -217,17 +200,32 @@ class WeatherDatabaseOpenMeteo:
 		for weather_time_point in other_database:
 			self.register_weather_time_point(weather_time_point)
 
-	# Sometimes, points will have missing data over a priod of time. The function 'pull_data' will pull that data
-	# from openmeteo and add it to the database so that each point within the entry grid square exists for a continuous period of time.
-	# This can also be used to collect training data
+	# The function 'pull_data' will pull that data from openmeteo and add
+	# it to the database so that each point within the entry grid square exists for a
+	# continuous period of time.
 	def pull_data(
 		self,
-		entry_grid_latitude_index: int,
-		entry_grid_longitude_index: int,
-		start_datetime: datetime.datetime | None = None,
-		end_datetime: datetime.datetime | None = None,
-		overwrite: bool = False,
-	) -> bool:
-		collector: openmeteo.OpenMeteoAreaDataCollector = (
-			openmeteo.OpenMeteoAreaDataCollector()
+		cordinates: data_models.GeographicCordinate
+		| Collection[data_models.GeographicCordinate],
+		start_datetime: datetime.datetime,
+		end_datetime: datetime.datetime,
+		hourly_parameters: Sequence[data_models.WeatherQuantity] | None = None,
+		daily_parameters: Sequence[data_models.WeatherQuantity] | None = None,
+	):
+		if hourly_parameters is None:
+			hourly_parameters = openmeteo.OPEN_METEO_HOURLY_PARAMETERS
+
+		if daily_parameters is None:
+			daily_parameters = openmeteo.OPEN_METEO_DAILY_PARAMETERS
+
+		collector: openmeteo.OpenMeteoAreaSpanDataCollector = (
+			openmeteo.OpenMeteoAreaSpanDataCollector.from_points(
+				list_of_points=cordinates,
+				start_date=start_datetime,
+				end_date=end_datetime,
+				hourly_parameters=hourly_parameters,
+				daily_parameters=daily_parameters,
+			)
 		)
+
+		self.register_weather_span_area(collector.get())

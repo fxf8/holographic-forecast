@@ -5,10 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "debugpy>=1.8.12",
-    "intervaltree>=3.1.0",
     "keras>=3.8.0",
     "numpy>=2.0.2",
+    "portion>=2.6.0",
     "pyright>=1.1.396",
     "requests>=2.32.3",
     "tensorflow>=2.18.0",
@@ -22,6 +21,7 @@ indent-style = "tab"
 
 [dependency-groups]
 dev = [
+    "debugpy>=1.8.12",
     "ipython>=9.0.2",
     "reindent>=3.5.1",
 ]

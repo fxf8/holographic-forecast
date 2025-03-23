@@ -203,10 +203,9 @@ name = "holographic-forecast"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "debugpy" },
-    { name = "intervaltree" },
     { name = "keras" },
     { name = "numpy" },
+    { name = "portion" },
     { name = "pyright" },
     { name = "requests" },
     { name = "tensorflow" },
@@ -214,16 +213,16 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "debugpy" },
     { name = "ipython" },
     { name = "reindent" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "debugpy", specifier = ">=1.8.12" },
-    { name = "intervaltree", specifier = ">=3.1.0" },
     { name = "keras", specifier = ">=3.8.0" },
     { name = "numpy", specifier = ">=2.0.2" },
+    { name = "portion", specifier = ">=2.6.0" },
     { name = "pyright", specifier = ">=1.1.396" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "tensorflow", specifier = ">=2.18.0" },
@@ -231,6 +230,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "debugpy", specifier = ">=1.8.12" },
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "reindent", specifier = ">=3.5.1" },
 ]
@@ -243,15 +243,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442 },
 ]
-
-[[package]]
-name = "intervaltree"
-version = "3.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "sortedcontainers" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/50/fb/396d568039d21344639db96d940d40eb62befe704ef849b27949ded5c3bb/intervaltree-3.1.0.tar.gz", hash = "sha256:902b1b88936918f9b2a19e0e5eb7ccb430ae45cde4f39ea4b36932920d33952d", size = 32861 }
 
 [[package]]
 name = "ipython"
@@ -543,6 +534,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523", size = 63772 },
+]
+
+[[package]]
+name = "portion"
+version = "2.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/11/4a/bec3f396c3702f3281a3ea8bd73ce8660a5b3334de71b4fb93f45cdfa572/portion-2.6.0.tar.gz", hash = "sha256:6fb538b57a92058f0edd360667694448aa3fc028ab97e41e3091359d14ba4dd5", size = 53885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/1f/32edd9aa4bedfe0dffe9aa9d298f14fb8ad06633492f2f7ad82ae997a2f7/portion-2.6.0-py3-none-any.whl", hash = "sha256:9132580df989b1985dae1caa3070b768f2a3360b40c89c59daa4acc7e6674dc4", size = 28116 },
 ]
 
 [[package]]

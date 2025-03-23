@@ -37,7 +37,7 @@ def sample_json_responses() -> Sequence[data_models.OpenMeteoResponseJSON]:
 				latitude_deg=36.1716, longitude_deg=115.1391
 			)
 		)
-		responses = data_collector.get()
+		responses = data_collector.request()
 		file_contents = [response.json() for response in responses]
 		logger.info(f"Saving data to {data_cache_filepath}")
 

@@ -1,6 +1,6 @@
 import datetime
 from dataclasses import dataclass
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 
 import requests
 
@@ -10,9 +10,10 @@ OPEN_METEO_HISTORICAL_ENDPOINT: str = "https://archive-api.open-meteo.com/v1/arc
 
 
 @dataclass
-class OpenMeteoPointDataCollector:
+class OpenMeteoPointSpanDataCollector:
 	"""
-	Requester for OpenMeteo historical data at a single point. Meant to be used by OpenMeteoAreaDataCollector which uses a requests.Session
+	Requester for OpenMeteo historical data at a single point over a span of time.
+	Meant to be used by OpenMeteoAreaSpanDataCollector which uses a requests.Session
 	"""
 
 	position: data_models.GeographicCordinate
@@ -22,8 +23,8 @@ class OpenMeteoPointDataCollector:
 	end_date: datetime.date
 
 	timezone: datetime.timezone
-	hourly_parameters: list[data_models.WeatherQuantity]
-	daily_parameters: list[data_models.WeatherQuantity]
+	hourly_parameters: Sequence[data_models.WeatherQuantity]
+	daily_parameters: Sequence[data_models.WeatherQuantity]
 
 	def prepare_request(self) -> requests.PreparedRequest:
 		parameters: Mapping[str, str] = {
@@ -49,26 +50,32 @@ class OpenMeteoPointDataCollector:
 
 
 @dataclass
-class OpenMeteoAreaDataCollector:
-	points: list[OpenMeteoPointDataCollector]
+class OpenMeteoAreaSpanDataCollector:
+	points: Collection[OpenMeteoPointSpanDataCollector]
 
-	def get(self) -> list[requests.Response]:
+	def request(self) -> list[data_models.OpenMeteoResponseJSON]:
 		with requests.Session() as session:
-			return [point.get(session) for point in self.points]
+			return [point.get(session).json() for point in self.points]
+
+	def get(self) -> data_models.WeatherSpanArea:
+		return data_models.WeatherSpanArea.from_openmeteo_json(
+			json_responses=self.request()
+		)
 
 	@classmethod
 	def from_points(
 		cls,
-		list_of_points: list[data_models.GeographicCordinate],
+		list_of_points: Collection[data_models.GeographicCordinate]
+		| data_models.GeographicCordinate,
 		start_date: datetime.date,
 		end_date: datetime.date,
-		hourly_parameters: list[data_models.WeatherQuantity],
-		daily_parameters: list[data_models.WeatherQuantity],
+		hourly_parameters: Sequence[data_models.WeatherQuantity],
+		daily_parameters: Sequence[data_models.WeatherQuantity],
 		timezone: datetime.timezone = datetime.timezone.utc,
-	) -> "OpenMeteoAreaDataCollector":
+	) -> "OpenMeteoAreaSpanDataCollector":
 		return cls(
 			[
-				OpenMeteoPointDataCollector(
+				OpenMeteoPointSpanDataCollector(
 					point,
 					start_date,
 					end_date,
@@ -76,7 +83,11 @@ class OpenMeteoAreaDataCollector:
 					hourly_parameters,
 					daily_parameters,
 				)
-				for point in list_of_points
+				for point in (
+					list_of_points
+					if isinstance(list_of_points, Collection)
+					else [list_of_points]
+				)
 			]
 		)
 
