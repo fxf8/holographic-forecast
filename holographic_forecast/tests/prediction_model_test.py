@@ -11,7 +11,6 @@ from typing import cast
 
 import tensorflow as tf
 import keras
-import requests
 
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.openmeteo_data_collection as odc
@@ -69,7 +68,7 @@ def generate_data_sample() -> data_models.WeatherSpanArea:
 		logger.info(f"{start_date = }")
 		logger.info(f"{end_date = }")
 
-		data_collector = odc.OpenMeteoAreaDataCollector.from_points(
+		data_collector = odc.OpenMeteoAreaSpanDataCollector.from_points(
 			list_of_points=points,
 			start_date=start_date,
 			end_date=end_date,
@@ -77,10 +76,9 @@ def generate_data_sample() -> data_models.WeatherSpanArea:
 			daily_parameters=odc.OPEN_METEO_DAILY_PARAMETERS,
 		)
 
-		responses: list[requests.Response] = data_collector.get()
-		response_data: list[data_models.OpenMeteoResponseJSON] = [
-			response.json() for response in responses
-		]
+		response_data: list[data_models.OpenMeteoResponseJSON] = (
+			data_collector.request()
+		)
 
 		with open(json_cache_path, "w") as f:
 			json.dump(response_data, f)

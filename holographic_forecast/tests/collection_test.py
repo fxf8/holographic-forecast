@@ -51,7 +51,7 @@ def collect_data_sample(center: data_models.GeographicCordinate):
 	logger.info(f"{start_date = }")
 	logger.info(f"{end_date = }")
 
-	data_collector = odc.OpenMeteoAreaDataCollector.from_points(
+	data_collector = odc.OpenMeteoAreaSpanDataCollector.from_points(
 		list_of_points=points,
 		start_date=start_date,
 		end_date=end_date,
@@ -68,12 +68,12 @@ def test_collection_all_parameters():
 	)
 
 	logger.info("Getting data...")
-	responses = data_collector.get()
+	responses = data_collector.request()
 
 	logger.info(f"Done getting data. Data info:\n{len(responses) = }\n")
 
 	with open("example/open-meteo/open-meteo-4-param-response-2-day.json", "w") as f:
-		json.dump(responses[0].json(), f)
+		json.dump(responses, f)
 
 
 if __name__ == "__main__":
