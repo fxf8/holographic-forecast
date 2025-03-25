@@ -17,7 +17,7 @@ dependencies = [
 reportExplicitAny = false
 
 [tool.ruff.format]
-indent-style = "tab"
+indent-style = "space"
 
 [tool.uv.sources]
 portion = { git = "https://github.com/FuexFollets/portion.git", rev = "1ffad0583146480455529ba443b3d06a970834fa" }
