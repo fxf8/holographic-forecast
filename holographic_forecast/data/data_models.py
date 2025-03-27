@@ -134,6 +134,7 @@ class GeographicCordinate:
                 )
 
 
+# 'hourly_units' key. Maps unit name to unit symbol
 OpenMeteoResponseQuantities = Mapping[str, str]
 OpenMeteoResponseValues = Mapping[str, Sequence[str | float]]
 OpenMeteoResponseJSON = Mapping[
@@ -146,7 +147,7 @@ class WeatherQuantity:
     name: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class WeatherTimePoint:
     """
     Weather data at a certain time and certain location
@@ -156,6 +157,81 @@ class WeatherTimePoint:
     cordinate: GeographicCordinate
     elevation_meters: float
     data: Collection[tuple[WeatherQuantity, float | str]]
+
+
+@dataclass
+class WeatherCollection:
+    """
+    Unstructured and flexible collection of weather time points
+    """
+
+    data: MutableSequence[WeatherTimePoint]
+
+    def __iter__(self) -> Iterator[WeatherTimePoint]:
+        return iter(self.data)
+
+    def import_meteo_json(self, json_response: OpenMeteoResponseJSON) -> Self:
+        elevation_meters: float = cast(float, json_response["elevation"])
+        latitude_deg: float = cast(float, json_response["latitude"])
+        longitude_deg: float = cast(float, json_response["longitude"])
+
+        hourly_data: OpenMeteoResponseValues = cast(
+            OpenMeteoResponseValues, json_response["hourly"]
+        )
+        daily_data: OpenMeteoResponseValues = cast(
+            OpenMeteoResponseValues, json_response["daily"]
+        )
+
+        timezone = datetime.timezone(
+            name=cast(str, json_response["timezone"]),
+            offset=datetime.timedelta(
+                seconds=cast(int, json_response["utc_offset_seconds"])
+            ),
+        )
+
+        hourly_times_iso: Sequence[str] = cast(Sequence[str], hourly_data["time"])
+        hourly_quantities: Collection[str] = cast(Collection[str], hourly_data.keys())
+        daily_quantities: Collection[str] = cast(Collection[str], daily_data.keys())
+
+        for index in range(len(hourly_times_iso)):
+            time: datetime.datetime = datetime.datetime.fromisoformat(
+                hourly_times_iso[index]
+            ).astimezone(timezone)
+
+            self.data.append(
+                WeatherTimePoint(
+                    time=time,
+                    cordinate=GeographicCordinate(
+                        latitude_deg=latitude_deg,
+                        longitude_deg=longitude_deg,
+                    ),
+                    elevation_meters=elevation_meters,
+                    data=[
+                        *(
+                            (
+                                WeatherQuantity(hourly_quantity),
+                                hourly_data[hourly_quantity][index],
+                            )
+                            for hourly_quantity in hourly_quantities
+                        ),
+                        *(
+                            (
+                                WeatherQuantity(daily_quantity),
+                                daily_data[daily_quantity][index // 24],
+                            )
+                            for daily_quantity in daily_quantities
+                        ),
+                    ],
+                )
+            )
+
+        return self
+
+    def combine(self, other: "WeatherCollection") -> Self:
+        for weather_time_point in other:
+            self.data.append(weather_time_point)
+
+        return self
 
 
 @dataclass
@@ -169,17 +245,8 @@ class WeatherTimeArea:
     def __iter__(self) -> Iterator[WeatherTimePoint]:
         return iter(self.data)
 
-    def geographic_points(self) -> Generator[GeographicCordinate]:
-        return (weather_time_point.cordinate for weather_time_point in self.data)
-
 
 # Create an exception for missing quanitity
-
-
-class MissingQuantityException(Exception):
-    def __init__(self, message: str) -> None:
-        self.message: str = message
-        super().__init__(message)
 
 
 @dataclass
@@ -192,132 +259,3 @@ class WeatherSpanArea:
 
     def __iter__(self) -> Iterator[WeatherTimeArea]:
         return iter(self.data)
-
-    @classmethod
-    def from_openmeteo_json(
-        cls,
-        json_responses: Collection[OpenMeteoResponseJSON],
-        expected_weather_quantities: Sequence[WeatherQuantity] | None = None,
-    ) -> Self:
-        """
-        Creates a WeatherSpanArea from a JSON response from OpenMeteo
-
-        Args:
-            json_responses (Collection[Any]): A Collection of JSON responses from OpenMeteo, each from a different location
-            expected_weather_quantities (Sequence[WeatherQuantity] | None): Set of quantities to *EXPECT* and extract from the json response. Can be used to remove unintended quantities, specify order for quantities, and error for expected quanitities not provided. Defaults to None which returns all quantities in the response in lexicographical order.
-
-        Returns:
-            WeatherSpanArea: WeatherSpanArea
-        """
-
-        if len(json_responses) == 0:
-            return cls([])
-
-        example_response: OpenMeteoResponseJSON = next(iter(json_responses))
-
-        # Quantities only referes to the *NAME* of the quantity, not the value
-        hourly_quantities_in_response: Collection[WeatherQuantity] = [
-            WeatherQuantity(quantity_name)
-            for quantity_name in cast(
-                OpenMeteoResponseQuantities, example_response["hourly_units"]
-            ).keys()
-        ]
-
-        daily_quantities_in_response: Collection[WeatherQuantity] = [
-            WeatherQuantity(quantity_name)
-            for quantity_name in cast(
-                OpenMeteoResponseQuantities, example_response["daily_units"]
-            ).keys()
-        ]
-
-        quantities_in_response: Collection[WeatherQuantity] = (
-            hourly_quantities_in_response + daily_quantities_in_response
-        )
-
-        if expected_weather_quantities is None:
-            expected_weather_quantities = [
-                *sorted(quantities_in_response, key=lambda quantity: quantity.name)
-            ]
-
-        elif not set(expected_weather_quantities).issubset(set(quantities_in_response)):
-            raise MissingQuantityException(
-                f"Missing quantities in response: {set(expected_weather_quantities) - set(quantities_in_response)},"
-                + f"Expected: {set(expected_weather_quantities)}, Received: {set(quantities_in_response)}"
-            )
-
-        hourly_times: Sequence[str] = cast(
-            Sequence[str],
-            cast(OpenMeteoResponseValues, example_response["daily"])["time"],
-        )
-
-        # Currently empty data. Filled later
-        weather_span_area: WeatherSpanArea = cls(
-            data=[WeatherTimeArea([]) for _ in range(len(hourly_times))]
-        )
-
-        for json_response in json_responses:
-            latitude: float = cast(float, json_response["latitude"])
-            longitude: float = cast(float, json_response["longitude"])
-
-            timezone = datetime.timezone(
-                name=cast(str, json_response["timezone"]),
-                offset=datetime.timedelta(
-                    seconds=cast(int, json_response["utc_offset_seconds"])
-                ),
-            )
-
-            elevation: float = cast(float, json_response["elevation"])
-
-            hourly_data: OpenMeteoResponseValues = cast(
-                OpenMeteoResponseValues, json_response["hourly"]
-            )
-
-            daily_data: OpenMeteoResponseValues = cast(
-                OpenMeteoResponseValues, json_response["daily"]
-            )
-
-            for time_index, hourly_time in enumerate(hourly_times):
-                weather_span_area.data[time_index].data.append(
-                    WeatherTimePoint(
-                        time=datetime.datetime.fromisoformat(hourly_time).astimezone(
-                            timezone
-                        ),
-                        cordinate=GeographicCordinate(
-                            latitude_deg=latitude, longitude_deg=longitude
-                        ),
-                        data=[
-                            (
-                                expected_weather_quantity,
-                                hourly_data[expected_weather_quantity.name][time_index]
-                                if expected_weather_quantity.name in hourly_data
-                                else daily_data[expected_weather_quantity.name][
-                                    time_index // 24
-                                ],
-                            )
-                            for expected_weather_quantity in expected_weather_quantities
-                        ],
-                        elevation_meters=elevation,
-                    )
-                )
-
-        return weather_span_area
-
-    def geographic_points(self) -> Generator[GeographicCordinate] | None:
-        """
-        Returns None of the WeatherSpanArea is empty, otherwise returns a generator of all the geographic points in the WeatherSpanArea
-        """
-
-        if len(self.data) == 0:
-            return None
-
-        return self.data[0].geographic_points()
-
-    def insert_weather_time_point(
-        self,
-        weather_time_point: WeatherTimePoint,
-    ) -> None:
-        number_of_weather_time_areas: int = len(self.data)
-
-        if number_of_weather_time_areas == 0:
-            self.data.append(WeatherTimeArea([weather_time_point]))
-            return
