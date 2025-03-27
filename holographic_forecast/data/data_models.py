@@ -170,7 +170,10 @@ class WeatherCollection:
     def __iter__(self) -> Iterator[WeatherTimePoint]:
         return iter(self.data)
 
-    def import_meteo_json(self, json_response: OpenMeteoResponseJSON) -> Self:
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def import_meteo_json(self, json_response: OpenMeteoResponseJSON):
         elevation_meters: float = cast(float, json_response["elevation"])
         latitude_deg: float = cast(float, json_response["latitude"])
         longitude_deg: float = cast(float, json_response["longitude"])
@@ -225,13 +228,9 @@ class WeatherCollection:
                 )
             )
 
-        return self
-
-    def combine(self, other: "WeatherCollection") -> Self:
+    def combine(self, other: "WeatherCollection"):
         for weather_time_point in other:
             self.data.append(weather_time_point)
-
-        return self
 
 
 @dataclass
@@ -256,6 +255,56 @@ class WeatherSpanArea:
     """
 
     data: MutableSequence[WeatherTimeArea]
+    start_datetime: datetime.datetime
+    end_datetime: datetime.datetime
 
     def __iter__(self) -> Iterator[WeatherTimeArea]:
         return iter(self.data)
+
+    @classmethod
+    def from_weather_collection(cls, weather_collection: WeatherCollection) -> Self:
+        if len(weather_collection) == 0:
+            raise ValueError(
+                "weather_collection is empty `len(weather_collection) == 0`"
+            )
+
+        sample_point: WeatherTimePoint = next(iter(weather_collection))
+        start_datetime: datetime.datetime = sample_point.time
+        end_datetime: datetime.datetime = sample_point.time
+
+        for weather_time_point in weather_collection:
+            if weather_time_point.time < start_datetime:
+                start_datetime = weather_time_point.time
+
+            if end_datetime < weather_time_point.time:
+                end_datetime = weather_time_point.time
+
+        number_of_timesteps: int = (
+            int((end_datetime - start_datetime).total_seconds()) // 3600
+        )
+
+        new_weather_span_area: WeatherSpanArea = cls(
+            data=[WeatherTimeArea(data=[]) for _ in range(number_of_timesteps)],
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+        )
+
+        for weather_time_point in weather_collection:
+            insertion_index: int = (
+                int((weather_time_point.time - start_datetime).total_seconds()) // 3600
+            )
+
+            new_weather_span_area.data[insertion_index].data.append(weather_time_point)
+
+        return new_weather_span_area
+
+    @classmethod
+    def from_openmeteo_json(
+        cls, json_responses: Sequence[OpenMeteoResponseJSON]
+    ) -> Self:
+        weather_collection: WeatherCollection = WeatherCollection(data=[])
+
+        for json_response in json_responses:
+            weather_collection.import_meteo_json(json_response)
+
+        return cls.from_weather_collection(weather_collection)
