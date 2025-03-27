@@ -164,8 +164,7 @@ class WeatherSpanAreaEmbedder:
     def embed_model_input(
         self,
         predicted_cordinates: data_models.GeographicCordinate
-        | Collection[data_models.GeographicCordinate]
-        | None = None,
+        | Collection[data_models.GeographicCordinate],
         ordering: Sequence[data_models.WeatherQuantity] | None = None,
         parameter_to_float: dict[
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
@@ -189,14 +188,6 @@ class WeatherSpanAreaEmbedder:
 
         if isinstance(predicted_cordinates, data_models.GeographicCordinate):
             predicted_cordinates = [predicted_cordinates]
-
-        elif predicted_cordinates is None:
-            predicted_cordinates = [
-                *cast(
-                    Generator[data_models.GeographicCordinate],
-                    self.weather_span_area.geographic_points(),
-                )
-            ]
 
         return tf.convert_to_tensor(
             [

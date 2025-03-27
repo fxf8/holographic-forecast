@@ -1,4 +1,3 @@
-import bisect
 import datetime
 import enum
 import math
@@ -231,6 +230,9 @@ class WeatherCollection:
     def combine(self, other: "WeatherCollection"):
         for weather_time_point in other:
             self.data.append(weather_time_point)
+
+    def add(self, weather_time_point: WeatherTimePoint):
+        self.data.append(weather_time_point)
 
 
 @dataclass

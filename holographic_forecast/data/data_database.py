@@ -5,14 +5,12 @@ from typing import Self, cast
 from collections.abc import (
     Callable,
     Generator,
-    Iterator,
     Sequence,
     Collection,
     ValuesView,
 )
 from dataclasses import dataclass
 import pickle
-import bisect
 import datetime
 import math
 
@@ -158,6 +156,7 @@ class WeatherDatabaseOpenMeteo:
             # center.longitude - longitude = +-sqrt(radius - (center.latitude - latitude)^2)
             # longitude = center.longitude +-sqrt(radius - (center.latitude - latitude)^2)
 
+            # Radius in measure of longitude/latitude degrees
             radius_deg: float = (
                 radius_miles * data_models.GeographicCordinate.LATITUDE_DEGREES_PER_MILE
             )
@@ -185,51 +184,31 @@ class WeatherDatabaseOpenMeteo:
         start_datetime: datetime.datetime,
         end_datetime: datetime.datetime,
         point_selector: PointSelector,
-        *,
-        pull_missing_data: bool = True,
-        hourly_parameters: Sequence[data_models.WeatherQuantity] | None = None,
-        daily_parameters: Sequence[data_models.WeatherQuantity] | None = None,
     ) -> data_models.WeatherSpanArea:
-        if hourly_parameters is None:
-            hourly_parameters = openmeteo.OPEN_METEO_HOURLY_PARAMETERS
+        weather_collection: data_models.WeatherCollection = (
+            data_models.WeatherCollection(data=[])
+        )
 
-        if daily_parameters is None:
-            daily_parameters = openmeteo.OPEN_METEO_DAILY_PARAMETERS
+        time_interval: P.Interval = P.Interval(start_datetime, end_datetime)
 
-        data_in_latitude_bounds: P.IntervalDict[
+        latitude_interval_dict_selection: P.IntervalDict[
             P.IntervalDict[P.IntervalDict[data_models.WeatherTimePoint]]
         ] = self.entry_interval_dict[point_selector.latitude_interval_bounds_deg]
 
-        number_of_timesteps: int = (
-            int((end_datetime - start_datetime).total_seconds()) // 3600
-        )
-
-        empty_weather_span_area: data_models.WeatherSpanArea = (
-            data_models.WeatherSpanArea(
-                data=[
-                    data_models.WeatherTimeArea(data=[])
-                    for _ in range(number_of_timesteps)
-                ]
-            )
-        )
-
-        for latitude_interval in data_in_latitude_bounds.values():
-            if latitude_interval.domain().lower is None:
+        for latitude_interval_dict in latitude_interval_dict_selection.values():
+            if latitude_interval_dict.domain().lower is None:
                 continue
 
-            longitude_interval_dict: P.IntervalDict[
+            longitude_interval_dict_selection: P.IntervalDict[
                 P.IntervalDict[data_models.WeatherTimePoint]
-            ] = latitude_interval[
+            ] = latitude_interval_dict[
                 point_selector.longitude_interval_bounds_deg(
-                    cast(float, latitude_interval.domain().lower)
+                    cast(float, latitude_interval_dict.domain().lower)
                 )
             ]
 
-            for time_interval_dict in longitude_interval_dict.values():
-                weather_time_points: ValuesView[data_models.WeatherTimePoint] = (
-                    time_interval_dict[
-                        P.Interval(start_datetime, end_datetime)
-                    ].values()
-                )
+            for time_interval_dict in longitude_interval_dict_selection.values():
+                for weather_time_point in time_interval_dict[time_interval].values():
+                    weather_collection.add(weather_time_point)
 
-                for weather_time_point in weather_time_points:
+        return data_models.WeatherSpanArea.from_weather_collection(weather_collection)
