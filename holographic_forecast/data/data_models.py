@@ -1,4 +1,6 @@
+import bisect
 import datetime
+import enum
 import math
 
 from collections.abc import (
@@ -25,8 +27,49 @@ def drange(start: float, stop: float, step: float = 1.0) -> Generator[float]:
 class GeographicCordinate:
     MILES_PER_LATITUDE_DEGREE: ClassVar[float] = 69.0
     LATITUDE_DEGREES_PER_MILE: ClassVar[float] = 1 / MILES_PER_LATITUDE_DEGREE
-    latitude_deg: float  # x axis (relative)
-    longitude_deg: float  # y axis (relative)
+
+    latitude_deg: float  # y axis vertical (relative)
+    longitude_deg: float  # y axis horizontal (relative)
+
+    class Direction(enum.Enum):
+        North = 1
+        South = 2
+        East = 3
+        West = 4
+
+    def in_direction_degrees(
+        self, direction: Direction, degrees: float
+    ) -> "GeographicCordinate":
+        if direction == GeographicCordinate.Direction.North:
+            return GeographicCordinate(
+                latitude_deg=self.latitude_deg + degrees,
+                longitude_deg=self.longitude_deg,
+            )
+
+        if direction == GeographicCordinate.Direction.South:
+            return GeographicCordinate(
+                latitude_deg=self.latitude_deg - degrees,
+                longitude_deg=self.longitude_deg,
+            )
+
+        if direction == GeographicCordinate.Direction.East:
+            return GeographicCordinate(
+                latitude_deg=self.latitude_deg,
+                longitude_deg=self.longitude_deg + degrees,
+            )
+
+        if direction == GeographicCordinate.Direction.West:
+            return GeographicCordinate(
+                latitude_deg=self.latitude_deg,
+                longitude_deg=self.longitude_deg - degrees,
+            )
+
+    def in_direction_miles(
+        self, direction: Direction, miles: float
+    ) -> "GeographicCordinate":
+        return self.in_direction_degrees(
+            direction, miles * GeographicCordinate.LATITUDE_DEGREES_PER_MILE
+        )
 
     def points_within_radius_grid(
         self, radius_miles: float, distance_between_points_miles: float
@@ -268,3 +311,13 @@ class WeatherSpanArea:
             return None
 
         return self.data[0].geographic_points()
+
+    def insert_weather_time_point(
+        self,
+        weather_time_point: WeatherTimePoint,
+    ) -> None:
+        number_of_weather_time_areas: int = len(self.data)
+
+        if number_of_weather_time_areas == 0:
+            self.data.append(WeatherTimeArea([weather_time_point]))
+            return

@@ -222,7 +222,7 @@ dev = [
 requires-dist = [
     { name = "keras", specifier = ">=3.8.0" },
     { name = "numpy", specifier = ">=2.0.2" },
-    { name = "portion", git = "https://github.com/FuexFollets/portion.git?rev=1ffad0583146480455529ba443b3d06a970834fa" },
+    { name = "portion", git = "https://github.com/FuexFollets/portion.git?rev=afbe614a3b026d5157d35d7d602b32aaa6d3a093" },
     { name = "pyright", specifier = ">=1.1.396" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "tensorflow", specifier = ">=2.18.0" },
@@ -539,7 +539,7 @@ wheels = [
 [[package]]
 name = "portion"
 version = "2.6.1"
-source = { git = "https://github.com/FuexFollets/portion.git?rev=1ffad0583146480455529ba443b3d06a970834fa#1ffad0583146480455529ba443b3d06a970834fa" }
+source = { git = "https://github.com/FuexFollets/portion.git?rev=afbe614a3b026d5157d35d7d602b32aaa6d3a093#afbe614a3b026d5157d35d7d602b32aaa6d3a093" }
 dependencies = [
     { name = "sortedcontainers" },
 ]

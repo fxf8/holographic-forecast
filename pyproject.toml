@@ -20,7 +20,7 @@ reportExplicitAny = false
 indent-style = "space"
 
 [tool.uv.sources]
-portion = { git = "https://github.com/FuexFollets/portion.git", rev = "1ffad0583146480455529ba443b3d06a970834fa" }
+portion = { git = "https://github.com/FuexFollets/portion.git", rev = "afbe614a3b026d5157d35d7d602b32aaa6d3a093" }
 
 [dependency-groups]
 dev = [
