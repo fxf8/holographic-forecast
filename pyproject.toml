@@ -13,6 +13,9 @@ dependencies = [
     "tensorflow>=2.18.0",
 ]
 
+[tool.setuptools]
+packages = ["holographic_forecast", "tests"]
+
 [tool.basedpyright]
 reportExplicitAny = false
 

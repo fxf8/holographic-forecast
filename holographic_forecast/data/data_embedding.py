@@ -1,15 +1,16 @@
 # pyright: reportMissingTypeStubs=false
 # pyright: reportUnknownMemberType=false
 
-from collections.abc import Collection, Sequence, Generator, Mapping
-from typing import Callable, cast, SupportsFloat
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Callable, SupportsFloat, cast
 
 import numpy as np
 import numpy.typing as npt
 import tensorflow as tf
 
 import holographic_forecast.data.data_models as data_models
+import holographic_forecast.data.openmeteo_data_collection as openmeteo
 
 
 @dataclass
@@ -18,27 +19,33 @@ class WeatherTimePointEmbedder:
 
     def embed_weather_data(
         self,
-        ordering: Sequence[data_models.WeatherQuantity] | None = None,
+        expected_quantities: Sequence[data_models.WeatherQuantity] | None = None,
         parameter_to_float: Mapping[
             data_models.WeatherQuantity, Callable[[float | str], SupportsFloat]
         ]
         | None = None,
-    ) -> npt.NDArray[np.float32]:
+        additional_parameter_for_missing_values: bool = True,
+    ) -> tuple[npt.NDArray[np.float32], int]:  # shape (n_features,), output_dimension
         if parameter_to_float is None:
             parameter_to_float = {}
 
         # Only use parameter_to_float when its weather quantity exists.
         # If its a string, use `float`
-        if ordering is None:
-            return np.array(
-                [
-                    parameter_to_float.get(item[0], float)(item[1])
-                    for item in self.weather_time_point.data
-                    if not isinstance(item[1], str | None)
-                ]
+
+        if expected_quantities is None:
+            expected_quantities = (
+                openmeteo.OPEN_METEO_HOURLY_PARAMETERS
+                + openmeteo.OPEN_METEO_DAILY_PARAMETERS
             )
 
-        embedded_data: Sequence[SupportsFloat] = []
+        output_dimension: int = (
+            len(expected_quantities) * 2
+            if additional_parameter_for_missing_values
+            else len(expected_quantities)
+        )
+        embedded_data: npt.NDArray[np.float32] = np.zeros(
+            output_dimension, dtype=np.float32
+        )
 
         existing_data: Sequence[tuple[data_models.WeatherQuantity, float | str]] = [
             *self.weather_time_point.data
@@ -50,29 +57,18 @@ class WeatherTimePointEmbedder:
             if quantity in existing_data
         }
 
-        for expected_weather_quantity in ordering:
-            if expected_weather_quantity not in self.weather_time_point.data:
-                raise ValueError(
-                    f"Expected to find quantity {expected_weather_quantity} in data, but did not."
-                )
+        if additional_parameter_for_missing_values:
+            for index, quantity in enumerate(expected_quantities):
+                if quantity not in existing_quantities_and_index:
+                    embedded_data[index * 2] = parameter_to_float.get(quantity, float)(
+                        0.0
+                    )
 
-            value: str | float = existing_data[
-                existing_quantities_and_index[expected_weather_quantity]
-            ][1]
+                    embedded_data[index * 2 + 1] = parameter_to_float.get(
+                        quantity, float
+                    )(0.0 if quantity in existing_quantities_and_index else 1.0)
 
-            if (
-                isinstance(value, str)
-                and expected_weather_quantity not in parameter_to_float
-            ):
-                raise ValueError(
-                    f"Expected to find parameter_to_float for quantity {expected_weather_quantity}, but did not."
-                )
-
-            embedded_data.append(
-                parameter_to_float.get(expected_weather_quantity, float)(value)
-            )
-
-        return np.array(embedded_data)
+        return (embedded_data, output_dimension)
 
     def embed_geographic_data(self) -> npt.NDArray[np.float32]:
         return np.array(
@@ -91,12 +87,15 @@ class WeatherTimePointEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
         ]
         | None = None,
+        additional_parameter_for_missing_values: bool = True,
     ) -> npt.NDArray[np.float32]:  # shape (n_features,)
         return np.concatenate(
             [
                 self.embed_weather_data(
-                    ordering=ordering, parameter_to_float=parameter_to_float
-                ),
+                    expected_quantities=ordering,
+                    parameter_to_float=parameter_to_float,
+                    additional_parameter_for_missing_values=additional_parameter_for_missing_values,
+                )[0],
                 self.embed_geographic_data(),
                 np.array(
                     [
@@ -121,6 +120,7 @@ class WeatherTimeAreaEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
         ]
         | None = None,
+        additional_parameter_for_missing_values: bool = True,
     ) -> npt.NDArray[np.float32]:
         return np.array(  # index represents point over time
             [
@@ -128,6 +128,7 @@ class WeatherTimeAreaEmbedder:
                     predicted_cordinate=predicted_cordinate,
                     ordering=ordering,
                     parameter_to_float=parameter_to_float,
+                    additional_parameter_for_missing_values=additional_parameter_for_missing_values,
                 )
                 for weather_time_point in self.weather_time_area
             ]
@@ -141,6 +142,7 @@ class WeatherTimeAreaEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
         ]
         | None = None,
+        additional_parameter_for_missing_values: bool = True,
     ) -> tf.Tensor:  # shape (n_points, n_features)
         """
         The embedded tensor (2D) is meant to be **combined into a singular 1D tensor (through RNN)** later used in the prediction model.
@@ -151,6 +153,7 @@ class WeatherTimeAreaEmbedder:
                     predicted_cordinate=predicted_cordinate,
                     ordering=ordering,
                     parameter_to_float=parameter_to_float,
+                    additional_parameter_for_missing_values=additional_parameter_for_missing_values,
                 ),
                 axis=0,
             )
@@ -170,7 +173,9 @@ class WeatherSpanAreaEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], np.float32]
         ]
         | None = None,
-    ) -> tf.Tensor:  # Tensor shape (batch_size, timesteps, n_points, n_features)
+    ) -> (
+        tf.RaggedTensor
+    ):  # Tensor shape (batch_size, timesteps (ragged), n_points (ragged), n_features)
         """
         Embeds the tensor input for the weather prediction model.
 
@@ -189,16 +194,22 @@ class WeatherSpanAreaEmbedder:
         if isinstance(predicted_cordinates, data_models.GeographicCordinate):
             predicted_cordinates = [predicted_cordinates]
 
-        return tf.convert_to_tensor(
-            [
+        return cast(
+            tf.RaggedTensor,
+            tf.ragged.constant(
                 [
-                    WeatherTimeAreaEmbedder(weather_time_area).embed_to_numpy_2D_array(
-                        predicted_cordinate=predicted_cordinate,
-                        ordering=ordering,
-                        parameter_to_float=parameter_to_float,
-                    )
-                    for weather_time_area in self.weather_span_area
+                    [
+                        WeatherTimeAreaEmbedder(
+                            weather_time_area
+                        ).embed_to_numpy_2D_array(
+                            predicted_cordinate=predicted_cordinate,
+                            ordering=ordering,
+                            parameter_to_float=parameter_to_float,
+                            additional_parameter_for_missing_values=True,
+                        )
+                        for weather_time_area in self.weather_span_area
+                    ]
+                    for predicted_cordinate in predicted_cordinates
                 ]
-                for predicted_cordinate in predicted_cordinates
-            ]
+            ),
         )

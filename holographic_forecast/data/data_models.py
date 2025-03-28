@@ -155,7 +155,7 @@ class WeatherTimePoint:
     time: datetime.datetime
     cordinate: GeographicCordinate
     elevation_meters: float
-    data: Collection[tuple[WeatherQuantity, float | str]]
+    data: Sequence[tuple[WeatherQuantity, float | str]]
 
 
 @dataclass
@@ -282,7 +282,7 @@ class WeatherSpanArea:
                 end_datetime = weather_time_point.time
 
         number_of_timesteps: int = (
-            int((end_datetime - start_datetime).total_seconds()) // 3600
+            int((end_datetime - start_datetime).total_seconds()) // 3600 + 1
         )
 
         new_weather_span_area: WeatherSpanArea = cls(
