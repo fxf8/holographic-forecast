@@ -1,6 +1,4 @@
 from collections.abc import Sequence
-import sys
-import logging
 import os
 import json
 
@@ -9,17 +7,11 @@ from typing import cast
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.data_embedding as data_embedding
 
-import holographic_forecast.tests.collection_test as collection_test
+import tests.collection_test as collection_test
 
+import tests.log_setup as log_setup
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/parse-test.log"),
-    ],
-)
+logger = log_setup.get_logger(__name__, "logs/parse-test.log")
 
 
 def sample_json_responses() -> Sequence[data_models.OpenMeteoResponseJSON]:
@@ -37,8 +29,8 @@ def sample_json_responses() -> Sequence[data_models.OpenMeteoResponseJSON]:
                 latitude_deg=36.1716, longitude_deg=115.1391
             )
         )
-        responses = data_collector.request()
-        file_contents = [response.json() for response in responses]
+
+        file_contents = [*data_collector.request()]
         logger.info(f"Saving data to {data_cache_filepath}")
 
         with open(data_cache_filepath, "w") as file:
@@ -59,9 +51,13 @@ def test_data_model_json_parsing():
 
     logger.info(f"Done parsing data. Data info:\n{len(parsed_data.data) = }\n")
 
+    predicted_cordinates: list[data_models.GeographicCordinate] = [
+        weather_time_point.cordinate for weather_time_point in parsed_data.data[-1]
+    ]
+
     embedded_data = data_embedding.WeatherSpanAreaEmbedder(
         parsed_data
-    ).embed_model_input()
+    ).embed_model_input(predicted_cordinates=predicted_cordinates)
 
     logger.info(f"Done embedding data. Data info:\n{embedded_data = }")
 

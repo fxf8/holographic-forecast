@@ -1,19 +1,11 @@
-import sys
-import logging
-
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.data_embedding as data_embedding
 
-from holographic_forecast.tests.parse_test import sample_json_responses
+from tests.parse_test import sample_json_responses
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/embedding-test.log"),
-    ],
-)
+import tests.log_setup as log_setup
+
+logger = log_setup.get_logger(__name__, "logs/embed-test.log")
 
 
 def test_embedding():
@@ -23,9 +15,13 @@ def test_embedding():
 
     logger.info(f"Done parsing data. Data info:\n{len(parsed_data.data) = }\n")
 
+    predicted_cordinates: list[data_models.GeographicCordinate] = [
+        weather_time_point.cordinate for weather_time_point in parsed_data.data[-1]
+    ]
+
     embedded_data = data_embedding.WeatherSpanAreaEmbedder(
         parsed_data
-    ).embed_model_input()
+    ).embed_model_input(predicted_cordinates=predicted_cordinates)
 
     logger.info(f"Done embedding data. Data info:\n{embedded_data = }")
 

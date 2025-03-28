@@ -1,19 +1,12 @@
 import datetime
 import json
-import logging
-import sys
 
 import holographic_forecast.data.data_models as data_models
 import holographic_forecast.data.openmeteo_data_collection as odc
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/collection-test.log"),
-    ],
-)
+import tests.log_setup as log_setup
+
+logger = log_setup.get_logger(__name__, "logs/collection-test.log")
 
 
 def generate_points_radial():

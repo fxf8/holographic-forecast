@@ -2,8 +2,6 @@
 # pyright: reportUnknownMemberType=false
 
 import datetime
-import sys
-import logging
 import pathlib
 import json
 import os
@@ -17,17 +15,9 @@ import holographic_forecast.data.openmeteo_data_collection as odc
 import holographic_forecast.data.data_embedding as data_embedding
 import holographic_forecast.weather_models_tf as weather_models
 
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
+import tests.log_setup as log_setup
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/prediction-model-test.log", mode="w"),
-    ],
-)
+logger = log_setup.get_logger(__name__, "logs/prediction-model-test.log")
 
 
 def generate_data_sample() -> data_models.WeatherSpanArea:
@@ -90,11 +80,18 @@ def generate_data_sample() -> data_models.WeatherSpanArea:
 
 
 def embedded_data_sample() -> tf.Tensor:
-    data = generate_data_sample()
-    logging.info(f"{data = }")
+    weather_time_span = generate_data_sample()
+    logging.info(f"{weather_time_span = }")
+
+    predicted_cordinates: list[data_models.GeographicCordinate] = [
+        weather_time_point.cordinate
+        for weather_time_point in weather_time_span.data[-1]
+    ]
 
     # Shape (batch_size, timesteps, n_points, n_features)
-    return data_embedding.WeatherSpanAreaEmbedder(data).embed_model_input()
+    return data_embedding.WeatherSpanAreaEmbedder(weather_time_span).embed_model_input(
+        predicted_cordinates=predicted_cordinates
+    )
 
 
 def test_prediction_model(model_type: type):
