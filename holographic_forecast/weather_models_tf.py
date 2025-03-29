@@ -38,6 +38,7 @@ class WeatherModelV1(keras.Model):
                 else n_features,
             ),
             trainable=True,
+            initializer="glorot_uniform",
         )
 
         self.timesteps_reduction_gru: keras.layers.GRU = keras.layers.GRU(
