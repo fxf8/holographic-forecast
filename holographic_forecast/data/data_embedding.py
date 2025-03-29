@@ -24,7 +24,7 @@ class WeatherTimePointEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], SupportsFloat]
         ]
         | None = None,
-        additional_parameter_for_missing_values: bool = True,
+        additional_parameter_for_missing_values: bool = True, # If true, this will add an additional parameter for whether or not a value is present
     ) -> tuple[npt.NDArray[np.float32], int]:  # shape (n_features,), output_dimension
         if parameter_to_float is None:
             parameter_to_float = {}

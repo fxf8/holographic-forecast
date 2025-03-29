@@ -12,4 +12,3 @@ logging.basicConfig(
     ],
 )
 
-DATABASE_PATH = "

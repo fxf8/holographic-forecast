@@ -5,6 +5,7 @@ import datetime
 import pathlib
 import json
 import os
+import logging
 from typing import cast
 
 import tensorflow as tf
@@ -89,8 +90,11 @@ def embedded_data_sample() -> tf.Tensor:
     ]
 
     # Shape (batch_size, timesteps, n_points, n_features)
-    return data_embedding.WeatherSpanAreaEmbedder(weather_time_span).embed_model_input(
-        predicted_cordinates=predicted_cordinates
+    return cast(
+        tf.Tensor,
+        data_embedding.WeatherSpanAreaEmbedder(weather_time_span)
+        .embed_model_input(predicted_cordinates=predicted_cordinates)
+        .to_tensor(),
     )
 
 

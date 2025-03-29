@@ -7,7 +7,6 @@ from collections.abc import (
     Generator,
     Sequence,
     Collection,
-    ValuesView,
 )
 from dataclasses import dataclass
 import pickle
@@ -30,7 +29,6 @@ def first_element_[T](sequence: Sequence[T]) -> T:
 
 
 # Database for weather data from OpenMeteo
-@dataclass
 class WeatherDatabaseOpenMeteo:
     """
     Entriy keys are dependent on the latitude, longitude, and degrees per index.
@@ -49,6 +47,9 @@ class WeatherDatabaseOpenMeteo:
     entry_interval_dict: P.IntervalDict[
         P.IntervalDict[P.IntervalDict[data_models.WeatherTimePoint]]
     ]
+
+    def __init__(self):
+        self.entry_interval_dict = P.IntervalDict()
 
     def __iter__(self) -> Generator[data_models.WeatherTimePoint]:
         for latitude_line in self.entry_interval_dict.values():
@@ -115,8 +116,8 @@ class WeatherDatabaseOpenMeteo:
         self,
         cordinates: data_models.GeographicCordinate
         | Collection[data_models.GeographicCordinate],
-        start_datetime: datetime.datetime,
-        end_datetime: datetime.datetime,
+        start_datetime: datetime.date,
+        end_datetime: datetime.date,
         hourly_parameters: Sequence[data_models.WeatherQuantity] | None = None,
         daily_parameters: Sequence[data_models.WeatherQuantity] | None = None,
     ):
