@@ -10,7 +10,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
-from typing import ClassVar, Self, cast
+from typing import ClassVar, Self, cast, override
 from dataclasses import dataclass
 
 KM_PER_MILE: float = 1.60934
@@ -143,7 +143,32 @@ OpenMeteoResponseJSON = Mapping[
 
 @dataclass(frozen=True)
 class WeatherQuantity:
-    name: str
+    identifier: str
+
+    # Name does not have as much influence, therefore it is optional
+    name: str | None = None
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, WeatherQuantity) and self.identifier == other.identifier
+        )
+
+    @override
+    def __hash__(self) -> int:
+        return hash(self.identifier)
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, WeatherQuantity):
+            return NotImplemented
+
+        return self.identifier < other.identifier
+
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, WeatherQuantity):
+            return NotImplemented
+
+        return self.identifier > other.identifier
 
 
 @dataclass(frozen=True)
