@@ -34,10 +34,10 @@ class OpenMeteoPointSpanDataCollector:
             "end_date": self.end_date.isoformat(),
             "timezone": self.timezone.tzname(None),
             "hourly": ",".join(
-                map(lambda parameter: parameter.name, self.hourly_parameters)
+                map(lambda parameter: parameter.identifier, self.hourly_parameters)
             ),
             "daily": ",".join(
-                map(lambda parameter: parameter.name, self.daily_parameters)
+                map(lambda parameter: parameter.identifier, self.daily_parameters)
             ),
         }
 
