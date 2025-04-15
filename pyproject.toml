@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.11.14",
+    "aiolimiter>=1.2.1",
     "keras>=3.8.0",
+    "noaa-cdo-api>=0.0.2",
     "numpy>=2.0.2",
     "portion",
     "pyright>=1.1.396",
