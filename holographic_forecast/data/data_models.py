@@ -1,6 +1,7 @@
 import datetime
 import enum
 import math
+import pickle
 
 from collections.abc import (
     Collection,
@@ -10,8 +11,13 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from pathlib import Path
 from typing import ClassVar, Self, cast, override
 from dataclasses import dataclass
+
+import noaa_cdo_api
+
+noaa_responses = noaa_cdo_api.json_responses
 
 KM_PER_MILE: float = 1.60934
 
@@ -179,8 +185,7 @@ class WeatherTimePoint:
 
     time: datetime.datetime
     cordinate: GeographicCordinate
-    elevation_meters: float
-    data: Sequence[tuple[WeatherQuantity, float | str]]
+    data: MutableSequence[tuple[WeatherQuantity, float | str]]
 
 
 @dataclass
@@ -197,7 +202,16 @@ class WeatherCollection:
     def __len__(self) -> int:
         return len(self.data)
 
-    def import_meteo_json(self, json_response: OpenMeteoResponseJSON):
+    def save_file(self, path: Path):
+        with path.open("wb") as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load_file(cls, path: Path):
+        with path.open("rb") as file:
+            return cast(WeatherCollection, pickle.load(file))
+
+    def import_openmeteo_json(self, json_response: OpenMeteoResponseJSON):
         elevation_meters: float = cast(float, json_response["elevation"])
         latitude_deg: float = cast(float, json_response["latitude"])
         longitude_deg: float = cast(float, json_response["longitude"])
@@ -232,7 +246,6 @@ class WeatherCollection:
                         latitude_deg=latitude_deg,
                         longitude_deg=longitude_deg,
                     ),
-                    elevation_meters=elevation_meters,
                     data=[
                         *(
                             (
@@ -248,7 +261,62 @@ class WeatherCollection:
                             )
                             for daily_quantity in daily_quantities
                         ),
+                        (
+                            WeatherQuantity("elevation"),
+                            elevation_meters,
+                        ),
                     ],
+                )
+            )
+
+    def import_noaa_json(
+        self,
+        json_response: noaa_responses.DataJSON
+        | list[noaa_cdo_api.json_schemas.DatapointJSON],
+        station_id_to_cordinate: Mapping[str, GeographicCordinate],
+    ):
+        station_id_to_data: dict[str, list[WeatherTimePoint]] = {}
+
+        results = (
+            json_response["results"]
+            if isinstance(json_response, dict)
+            else json_response
+        )
+        for result in results:
+            result_station = result["station"]
+
+            if result_station not in station_id_to_cordinate:
+                raise ValueError(f"{result_station} not in station_id_to_cordinate")
+
+            if result_station not in station_id_to_data:
+                station_id_to_data[result_station] = []
+
+            index_of_time: int | None = None
+
+            # See if the result time is already in the station_id_to_data
+
+            for index, weather_time_point in enumerate(
+                station_id_to_data[result_station]
+            ):
+                if weather_time_point.time == result["date"]:
+                    index_of_time = index
+                    break
+
+            if index_of_time is None:
+                index_of_time = len(station_id_to_data[result_station])
+                station_id_to_data[result_station].append(
+                    WeatherTimePoint(
+                        time=datetime.datetime.fromisoformat(result["date"]),
+                        cordinate=station_id_to_cordinate[result_station],
+                        data=[],
+                    )
+                )
+
+            # each noaa result only has one quantity
+            station_id_to_data[result_station][index_of_time].data.append(
+                (
+                    WeatherQuantity(result["datatype"]),
+                    float(result["value"]),
                 )
             )
 
@@ -332,6 +400,6 @@ class WeatherSpanArea:
         weather_collection: WeatherCollection = WeatherCollection(data=[])
 
         for json_response in json_responses:
-            weather_collection.import_meteo_json(json_response)
+            weather_collection.import_openmeteo_json(json_response)
 
         return cls.from_weather_collection(weather_collection)
