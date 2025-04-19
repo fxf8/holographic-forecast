@@ -31,6 +31,7 @@ portion = { git = "https://github.com/FuexFollets/portion.git", rev = "afbe614a3
 [dependency-groups]
 dev = [
     "debugpy>=1.8.12",
+    "dotenv>=0.9.9",
     "ipython>=9.0.2",
     "pytest>=8.3.5",
     "reindent>=3.5.1",
