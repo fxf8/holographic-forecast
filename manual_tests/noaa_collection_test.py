@@ -5,7 +5,7 @@ import dotenv
 import holographic_forecast.data.noaa_data_collection as noaa_weather_collection
 import noaa_cdo_api
 
-cache_path = "noaa_cache/collection_test_cache.pkl"
+cache_path = Path("noaa_cache/collection_test_cache.pkl")
 
 # Ensure the directory exists, then the file
 
@@ -38,7 +38,7 @@ async def test_noaa_collection():
 
     print(result)
 
-    result.save_file(Path(cache_path))
+    result.save_file(cache_path)
 
 
 if __name__ == "__main__":
