@@ -642,7 +642,7 @@ wheels = [
 
 [[package]]
 name = "noaa-cdo-api"
-version = "0.0.2"
+version = "0.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -652,9 +652,9 @@ dependencies = [
     { name = "setuptools" },
     { name = "yarl" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/db/6f/757193eff734d69e8412585dfd63eebc5c21482fe2f5a40fd4ae33bb74a7/noaa_cdo_api-0.0.2.tar.gz", hash = "sha256:a2d616a54bb09abd4dbb062d043805889fd20d1d83d31cd2356100b4669bb306", size = 27475 }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/4a/94784d8bfe8fe84f665157d70cc0c4d23c11bf2eb471c1c7ca5b2dcbc0cd/noaa_cdo_api-0.0.3.tar.gz", hash = "sha256:92f2da08cf9330867900ebf3de92854fae5d2ecff1a35be42cbededf76914341", size = 27483 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/90/9d0a285eea288377d915f25c058ba139a933f5cebc88cb0ed89f1ffa69ed/noaa_cdo_api-0.0.2-py3-none-any.whl", hash = "sha256:cad72df1d517ce1f455df836045b9e31e2cd847bc773413c265d0cef5a0c95e1", size = 32143 },
+    { url = "https://files.pythonhosted.org/packages/57/20/74fcbc32cb27e647efb602f6c1de30a82fc594e047f8bfb5f1197b4a97ba/noaa_cdo_api-0.0.3-py3-none-any.whl", hash = "sha256:1a979f095f3a1ed6e073ab95e1c8fd3f7602ef1b67859db0f0e387ffd3634075", size = 32147 },
 ]
 
 [[package]]

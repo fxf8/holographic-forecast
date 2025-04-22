@@ -8,7 +8,7 @@ dependencies = [
     "aiohttp>=3.11.14",
     "aiolimiter>=1.2.1",
     "keras>=3.8.0",
-    "noaa-cdo-api>=0.0.2",
+    "noaa-cdo-api>=0.0.3",
     "numpy>=2.0.2",
     "portion",
     "pyright>=1.1.396",

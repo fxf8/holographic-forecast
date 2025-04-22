@@ -8,6 +8,7 @@ from collections.abc import (
     Generator,
     Iterator,
     Mapping,
+    MutableMapping,
     MutableSequence,
     Sequence,
 )
@@ -189,12 +190,13 @@ class WeatherTimePoint:
 
 
 @dataclass
-class WeatherCollection:
+class NOAAWeatherCollection:
     """
     Unstructured and flexible collection of weather time points
     """
 
     data: MutableSequence[WeatherTimePoint]
+    noaa_stations: MutableMapping[str, noaa_cdo_api.json_schemas.StationIDJSON]
 
     def __iter__(self) -> Iterator[WeatherTimePoint]:
         return iter(self.data)
@@ -209,118 +211,98 @@ class WeatherCollection:
     @classmethod
     def load_file(cls, path: Path):
         with path.open("rb") as file:
-            return cast(WeatherCollection, pickle.load(file))
-
-    def import_openmeteo_json(self, json_response: OpenMeteoResponseJSON):
-        elevation_meters: float = cast(float, json_response["elevation"])
-        latitude_deg: float = cast(float, json_response["latitude"])
-        longitude_deg: float = cast(float, json_response["longitude"])
-
-        hourly_data: OpenMeteoResponseValues = cast(
-            OpenMeteoResponseValues, json_response["hourly"]
-        )
-        daily_data: OpenMeteoResponseValues = cast(
-            OpenMeteoResponseValues, json_response["daily"]
-        )
-
-        timezone = datetime.timezone(
-            name=cast(str, json_response["timezone"]),
-            offset=datetime.timedelta(
-                seconds=cast(int, json_response["utc_offset_seconds"])
-            ),
-        )
-
-        hourly_times_iso: Sequence[str] = cast(Sequence[str], hourly_data["time"])
-        hourly_quantities: Collection[str] = cast(Collection[str], hourly_data.keys())
-        daily_quantities: Collection[str] = cast(Collection[str], daily_data.keys())
-
-        for index in range(len(hourly_times_iso)):
-            time: datetime.datetime = datetime.datetime.fromisoformat(
-                hourly_times_iso[index]
-            ).astimezone(timezone)
-
-            self.data.append(
-                WeatherTimePoint(
-                    time=time,
-                    cordinate=GeographicCordinate(
-                        latitude_deg=latitude_deg,
-                        longitude_deg=longitude_deg,
-                    ),
-                    data=[
-                        *(
-                            (
-                                WeatherQuantity(hourly_quantity),
-                                hourly_data[hourly_quantity][index],
-                            )
-                            for hourly_quantity in hourly_quantities
-                        ),
-                        *(
-                            (
-                                WeatherQuantity(daily_quantity),
-                                daily_data[daily_quantity][index // 24],
-                            )
-                            for daily_quantity in daily_quantities
-                        ),
-                        (
-                            WeatherQuantity("elevation"),
-                            elevation_meters,
-                        ),
-                    ],
-                )
-            )
+            return cast(NOAAWeatherCollection, pickle.load(file))
 
     def import_noaa_json(
         self,
         json_response: noaa_responses.DataJSON
         | list[noaa_cdo_api.json_schemas.DatapointJSON],
-        station_id_to_cordinate: Mapping[str, GeographicCordinate],
+        stations_info: Collection[noaa_cdo_api.json_schemas.StationIDJSON],
     ):
-        station_id_to_data: dict[str, list[WeatherTimePoint]] = {}
+        TIME_EPSILON: datetime.timedelta = datetime.timedelta(seconds=10)
+        for station in stations_info:
+            self.noaa_stations[station["id"]] = station
 
         results = (
             json_response["results"]
             if isinstance(json_response, dict)
             else json_response
         )
+
+        station_id_to_data: MutableMapping[str, MutableSequence[WeatherTimePoint]] = {}
+
         for result in results:
-            result_station = result["station"]
+            station_of_result = result["station"]
 
-            if result_station not in station_id_to_cordinate:
-                raise ValueError(f"{result_station} not in station_id_to_cordinate")
-
-            if result_station not in station_id_to_data:
-                station_id_to_data[result_station] = []
+            if station_of_result not in self.noaa_stations:
+                raise ValueError(
+                    f"{station_of_result} not in stations_info or stored self.noaa_stations"
+                )
 
             index_of_time: int | None = None
 
             # See if the result time is already in the station_id_to_data
 
+            if station_of_result not in station_id_to_data:
+                station_id_to_data[station_of_result] = []
+
             for index, weather_time_point in enumerate(
-                station_id_to_data[result_station]
+                station_id_to_data[station_of_result]
             ):
-                if weather_time_point.time == result["date"]:
+                lower_bound: datetime.datetime = weather_time_point.time - TIME_EPSILON
+                upper_bound: datetime.datetime = weather_time_point.time + TIME_EPSILON
+
+                result_time: datetime.datetime = datetime.datetime.fromisoformat(
+                    result["date"]
+                )
+
+                if lower_bound <= result_time <= upper_bound:
                     index_of_time = index
                     break
 
             if index_of_time is None:
-                index_of_time = len(station_id_to_data[result_station])
-                station_id_to_data[result_station].append(
+                index_of_time = len(station_id_to_data[station_of_result])
+                station_id_to_data[station_of_result].append(
                     WeatherTimePoint(
                         time=datetime.datetime.fromisoformat(result["date"]),
-                        cordinate=station_id_to_cordinate[result_station],
+                        cordinate=GeographicCordinate(
+                            longitude_deg=self.noaa_stations[station_of_result][
+                                "longitude"
+                            ],
+                            latitude_deg=self.noaa_stations[station_of_result][
+                                "latitude"
+                            ],
+                        ),
                         data=[],
                     )
                 )
 
             # each noaa result only has one quantity
-            station_id_to_data[result_station][index_of_time].data.append(
+            station_id_to_data[station_of_result][index_of_time].data.append(
                 (
                     WeatherQuantity(result["datatype"]),
                     float(result["value"]),
                 )
             )
 
-    def combine(self, other: "WeatherCollection"):
+            if not any(
+                quantity_and_value[0].identifier == "ELEVATION"
+                for quantity_and_value in station_id_to_data[station_of_result][
+                    index_of_time
+                ].data
+            ):
+                station_id_to_data[station_of_result][index_of_time].data.append(
+                    (
+                        WeatherQuantity("ELEVATION"),
+                        self.noaa_stations[station_of_result]["elevation"],
+                    )
+                )
+
+        for station in station_id_to_data:
+            for weather_time_point in station_id_to_data[station]:
+                self.data.append(weather_time_point)
+
+    def combine(self, other: "NOAAWeatherCollection"):
         for weather_time_point in other:
             self.data.append(weather_time_point)
 
@@ -357,7 +339,7 @@ class WeatherSpanArea:
         return iter(self.data)
 
     @classmethod
-    def from_weather_collection(cls, weather_collection: WeatherCollection) -> Self:
+    def from_weather_collection(cls, weather_collection: NOAAWeatherCollection) -> Self:
         if len(weather_collection) == 0:
             raise ValueError(
                 "weather_collection is empty `len(weather_collection) == 0`"
@@ -392,14 +374,3 @@ class WeatherSpanArea:
             new_weather_span_area.data[insertion_index].data.append(weather_time_point)
 
         return new_weather_span_area
-
-    @classmethod
-    def from_openmeteo_json(
-        cls, json_responses: Sequence[OpenMeteoResponseJSON]
-    ) -> Self:
-        weather_collection: WeatherCollection = WeatherCollection(data=[])
-
-        for json_response in json_responses:
-            weather_collection.import_openmeteo_json(json_response)
-
-        return cls.from_weather_collection(weather_collection)

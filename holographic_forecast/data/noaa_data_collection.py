@@ -1,5 +1,4 @@
 import datetime
-from typing import NamedTuple
 import noaa_cdo_api
 import holographic_forecast.data.data_models as data_models
 
@@ -14,20 +13,28 @@ class NOAADataCollector:
         self,
         dataset_id: str,
         extent: noaa_cdo_api.Extent,
-        timespan_start: datetime.datetime | datetime.date,
-        timespan_end: datetime.datetime | datetime.date,
+        timespan_start: datetime.datetime | datetime.date | str,
+        timespan_end: datetime.datetime | datetime.date | str,
         max_results: int = 1000,
     ) -> list[noaa_cdo_api.json_responses.StationIDJSON]:
         start_date_iso: str = (
-            timespan_start.date().isoformat()
-            if isinstance(timespan_start, datetime.datetime)
-            else timespan_start.isoformat()
+            (
+                timespan_start.date().isoformat()
+                if isinstance(timespan_start, datetime.datetime)
+                else timespan_start.isoformat()
+            )
+            if isinstance(timespan_start, (datetime.datetime, datetime.date))
+            else timespan_start
         )
 
         end_date_iso: str = (
-            timespan_end.date().isoformat()
-            if isinstance(timespan_end, datetime.datetime)
-            else timespan_end.isoformat()
+            (
+                timespan_end.date().isoformat()
+                if isinstance(timespan_end, datetime.datetime)
+                else timespan_end.isoformat()
+            )
+            if isinstance(timespan_end, (datetime.datetime, datetime.date))
+            else timespan_end
         )
 
         first_station_result = await self.noaa_client.get_stations(
@@ -78,56 +85,44 @@ class NOAADataCollector:
 
         return collected_results
 
-    class StationAndLocation(NamedTuple):
-        station_id: str
-        location: data_models.GeographicCordinate
-
     async def data_in_extent_and_timespan(
         self,
         dataset_id: str,
-        extent: noaa_cdo_api.Extent | list[StationAndLocation],
-        timespan_start: datetime.datetime | datetime.date,
-        timespan_end: datetime.datetime | datetime.date,
+        extent: noaa_cdo_api.Extent,
+        timespan_start: datetime.datetime | datetime.date | str,
+        timespan_end: datetime.datetime | datetime.date | str,
         max_results: int = 1000,
-    ) -> data_models.WeatherCollection:
+    ) -> data_models.NOAAWeatherCollection:
         start_date_iso: str = (
-            timespan_start.date().isoformat()
-            if isinstance(timespan_start, datetime.datetime)
-            else timespan_start.isoformat()
+            (
+                timespan_start.date().isoformat()
+                if isinstance(timespan_start, datetime.datetime)
+                else timespan_start.isoformat()
+            )
+            if isinstance(timespan_start, (datetime.datetime, datetime.date))
+            else timespan_start
         )
 
         end_date_iso: str = (
-            timespan_end.date().isoformat()
-            if isinstance(timespan_end, datetime.datetime)
-            else timespan_end.isoformat()
+            (
+                timespan_end.date().isoformat()
+                if isinstance(timespan_end, datetime.datetime)
+                else timespan_end.isoformat()
+            )
+            if isinstance(timespan_end, (datetime.datetime, datetime.date))
+            else timespan_end
         )
 
-        stations: list[NOAADataCollector.StationAndLocation] = (
-            extent
-            if isinstance(extent, list)
-            else (
-                [
-                    (
-                        NOAADataCollector.StationAndLocation(
-                            station_id=result["id"],
-                            location=data_models.GeographicCordinate(
-                                result["latitude"], result["longitude"]
-                            ),
-                        )
-                    )
-                    for result in await self.stations_in_extent_and_timespan(
-                        dataset_id=dataset_id,
-                        extent=extent,
-                        timespan_start=timespan_start,
-                        timespan_end=timespan_end,
-                    )
-                ]
-            )
+        stations = await self.stations_in_extent_and_timespan(
+            dataset_id=dataset_id,
+            extent=extent,
+            timespan_start=start_date_iso,
+            timespan_end=end_date_iso,
         )
 
         first_result = await self.noaa_client.get_data(
             datasetid=dataset_id,
-            stationid=[station.station_id for station in stations],
+            stationid=[station_info["id"] for station_info in stations],
             startdate=start_date_iso,
             enddate=end_date_iso,
             limit=1,
@@ -142,24 +137,21 @@ class NOAADataCollector:
             "count"
         ]
 
-        if max_results <= total_available_number_of_results:
-            raise ValueError(
-                f"max_results ({max_results}) must be greater than or equal to total_available_number_of_results ({total_available_number_of_results})"
-            )
-
-        max_results_per_request: int = 1000
+        MAX_RESULTS_PER_REQUEST: int = 1000
         collected_results: list[noaa_cdo_api.json_schemas.DatapointJSON] = []
 
-        for result_number in range(
-            1, total_available_number_of_results, max_results_per_request
+        for offset in range(
+            1,
+            min(total_available_number_of_results, max_results) - 1,
+            MAX_RESULTS_PER_REQUEST,
         ):
             results = await self.noaa_client.get_data(
                 datasetid=dataset_id,
-                stationid=[station.station_id for station in stations],
+                stationid=[station_info["id"] for station_info in stations],
                 startdate=start_date_iso,
                 enddate=end_date_iso,
-                limit=max_results_per_request,
-                offset=result_number,
+                limit=MAX_RESULTS_PER_REQUEST,
+                offset=offset,
             )
 
             if (
@@ -171,15 +163,13 @@ class NOAADataCollector:
 
         collected_results.append(first_result["results"][0])
 
-        weather_collection: data_models.WeatherCollection = (
-            data_models.WeatherCollection(data=[])
+        weather_collection: data_models.NOAAWeatherCollection = (
+            data_models.NOAAWeatherCollection(data=[], noaa_stations={})
         )
 
         weather_collection.import_noaa_json(
             json_response=collected_results,
-            station_id_to_cordinate={
-                station.station_id: station.location for station in stations
-            },
+            stations_info=[station_info for station_info in stations],
         )
 
         return weather_collection
