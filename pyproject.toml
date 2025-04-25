@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["holographic_forecast", "manual_tests"]
+packages = ["holographic_forecast", "manual_tests", "tests"]
 
 [tool.basedpyright]
 reportExplicitAny = false

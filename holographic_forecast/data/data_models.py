@@ -15,6 +15,7 @@ from collections.abc import (
 from pathlib import Path
 from typing import ClassVar, Self, cast, override
 from dataclasses import dataclass
+import portion as P
 
 import noaa_cdo_api
 
@@ -178,7 +179,13 @@ class WeatherQuantity:
         return self.identifier > other.identifier
 
 
-@dataclass(frozen=True)
+@dataclass
+class WeatherEntry:
+    quantity: WeatherQuantity
+    value: float | str
+
+
+@dataclass
 class WeatherTimePoint:
     """
     Weather data at a certain time and certain location
@@ -186,7 +193,16 @@ class WeatherTimePoint:
 
     time: datetime.datetime
     cordinate: GeographicCordinate
-    data: MutableSequence[tuple[WeatherQuantity, float | str]]
+    data: MutableSequence[WeatherEntry]
+
+    def __add__(self, other: "WeatherTimePoint"):
+        new_weather_time_point: WeatherTimePoint = WeatherTimePoint(
+            time=self.time, cordinate=self.cordinate, data=self.data
+        )
+
+        new_weather_time_point.data.extend(other.data)
+
+        return new_weather_time_point
 
 
 @dataclass
@@ -203,6 +219,16 @@ class NOAAWeatherCollection:
 
     def __len__(self) -> int:
         return len(self.data)
+
+    def __add__(self, other: "NOAAWeatherCollection"):
+        new_weather_collection: NOAAWeatherCollection = NOAAWeatherCollection(
+            data=self.data, noaa_stations=self.noaa_stations
+        )
+
+        new_weather_collection.data.extend(other.data)
+        new_weather_collection.noaa_stations.update(other.noaa_stations)
+
+        return new_weather_collection
 
     def save_file(self, path: Path):
         with path.open("wb") as file:
@@ -279,20 +305,20 @@ class NOAAWeatherCollection:
 
             # each noaa result only has one quantity
             station_id_to_data[station_of_result][index_of_time].data.append(
-                (
+                WeatherEntry(
                     WeatherQuantity(result["datatype"]),
                     float(result["value"]),
                 )
             )
 
             if not any(
-                quantity_and_value[0].identifier == "ELEVATION"
+                quantity_and_value.quantity.identifier == "ELEVATION"
                 for quantity_and_value in station_id_to_data[station_of_result][
                     index_of_time
                 ].data
             ):
                 station_id_to_data[station_of_result][index_of_time].data.append(
-                    (
+                    WeatherEntry(
                         WeatherQuantity("ELEVATION"),
                         self.noaa_stations[station_of_result]["elevation"],
                     )
@@ -321,8 +347,12 @@ class WeatherTimeArea:
     def __iter__(self) -> Iterator[WeatherTimePoint]:
         return iter(self.data)
 
+    def __add__(self, other: "WeatherTimeArea"):
+        new_weather_time_area: WeatherTimeArea = WeatherTimeArea(data=self.data)
 
-# Create an exception for missing quanitity
+        new_weather_time_area.data.extend(other.data)
+
+        return new_weather_time_area
 
 
 @dataclass
@@ -331,46 +361,37 @@ class WeatherTimespanArea:
     Weather over a span of time in multiple points (an area). Each index is one hour apart
     """
 
-    data: MutableSequence[WeatherTimeArea]
+    data: P.IntervalDict[WeatherTimeArea]
     start_datetime: datetime.datetime
     end_datetime: datetime.datetime
 
-    def __iter__(self) -> Iterator[WeatherTimeArea]:
-        return iter(self.data)
+    def __iter__(self) -> Iterator[tuple[P.Interval, WeatherTimeArea]]:
+        return iter(self.data.items())
 
-    @classmethod
-    def from_weather_collection(cls, weather_collection: NOAAWeatherCollection) -> Self:
-        if len(weather_collection) == 0:
-            raise ValueError(
-                "weather_collection is empty `len(weather_collection) == 0`"
-            )
-
+    def import_noaa_weather_collection(self, weather_collection: NOAAWeatherCollection):
         sample_point: WeatherTimePoint = next(iter(weather_collection))
-        start_datetime: datetime.datetime = sample_point.time
-        end_datetime: datetime.datetime = sample_point.time
+        imported_start_datetime: datetime.datetime = sample_point.time
+        imported_end_datetime: datetime.datetime = sample_point.time
 
         for weather_time_point in weather_collection:
-            if weather_time_point.time < start_datetime:
-                start_datetime = weather_time_point.time
+            if weather_time_point.time < imported_start_datetime:
+                imported_start_datetime = weather_time_point.time
+            if imported_end_datetime < weather_time_point.time:
+                imported_end_datetime = weather_time_point.time
 
-            if end_datetime < weather_time_point.time:
-                end_datetime = weather_time_point.time
+        if imported_start_datetime < self.start_datetime:
+            self.start_datetime = imported_start_datetime
 
-        number_of_timesteps: int = (
-            int((end_datetime - start_datetime).total_seconds()) // 3600 + 1
-        )
-
-        new_weather_span_area: WeatherTimespanArea = cls(
-            data=[WeatherTimeArea(data=[]) for _ in range(number_of_timesteps)],
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-        )
+        if self.end_datetime < imported_end_datetime:
+            self.end_datetime = imported_end_datetime
 
         for weather_time_point in weather_collection:
-            insertion_index: int = (
-                int((weather_time_point.time - start_datetime).total_seconds()) // 3600
-            )
+            self.data[weather_time_point.time].data.append(weather_time_point)
 
-            new_weather_span_area.data[insertion_index].data.append(weather_time_point)
-
-        return new_weather_span_area
+    def get_slice(
+        self, start_datetime: datetime.datetime, end_datetime: datetime.datetime
+    ):
+        return sum(
+            self.data[P.Interval(start_datetime, end_datetime)].values(),
+            WeatherTimeArea(data=[]),
+        )
