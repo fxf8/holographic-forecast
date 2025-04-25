@@ -362,31 +362,29 @@ class WeatherTimespanArea:
     """
 
     data: P.IntervalDict[WeatherTimeArea]
-    start_datetime: datetime.datetime
-    end_datetime: datetime.datetime
+
+    def __post_init__(self):
+        self.data = P.IntervalDict()
 
     def __iter__(self) -> Iterator[tuple[P.Interval, WeatherTimeArea]]:
         return iter(self.data.items())
 
     def import_noaa_weather_collection(self, weather_collection: NOAAWeatherCollection):
-        sample_point: WeatherTimePoint = next(iter(weather_collection))
-        imported_start_datetime: datetime.datetime = sample_point.time
-        imported_end_datetime: datetime.datetime = sample_point.time
-
         for weather_time_point in weather_collection:
-            if weather_time_point.time < imported_start_datetime:
-                imported_start_datetime = weather_time_point.time
-            if imported_end_datetime < weather_time_point.time:
-                imported_end_datetime = weather_time_point.time
+            if weather_time_point.time not in self.data:
+                self.data[weather_time_point.time] = WeatherTimeArea(data=[])
 
-        if imported_start_datetime < self.start_datetime:
-            self.start_datetime = imported_start_datetime
-
-        if self.end_datetime < imported_end_datetime:
-            self.end_datetime = imported_end_datetime
-
-        for weather_time_point in weather_collection:
             self.data[weather_time_point.time].data.append(weather_time_point)
+
+    @classmethod
+    def from_noaa_weather_collection(cls, weather_collection: NOAAWeatherCollection):
+        weather_timespan_area: WeatherTimespanArea = WeatherTimespanArea(
+            data=P.IntervalDict(),
+        )
+
+        weather_timespan_area.import_noaa_weather_collection(weather_collection)
+
+        return weather_timespan_area
 
     def get_slice(
         self, start_datetime: datetime.datetime, end_datetime: datetime.datetime
