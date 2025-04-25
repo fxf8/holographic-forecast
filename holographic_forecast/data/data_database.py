@@ -86,7 +86,7 @@ class WeatherDatabaseOpenMeteo:
             self.register_weather_time_point(weather_time_point)
 
     def register_weather_span_area(
-        self, weather_span_area: data_models.WeatherSpanArea
+        self, weather_span_area: data_models.WeatherTimespanArea
     ):
         for weather_time_area in weather_span_area:
             self.register_weather_time_area(weather_time_area)
@@ -95,14 +95,14 @@ class WeatherDatabaseOpenMeteo:
         self,
         data: data_models.WeatherTimePoint
         | data_models.WeatherTimeArea
-        | data_models.WeatherSpanArea,
+        | data_models.WeatherTimespanArea,
     ):
         match data:
             case data_models.WeatherTimePoint():
                 self.register_weather_time_point(data)
             case data_models.WeatherTimeArea():
                 self.register_weather_time_area(data)
-            case data_models.WeatherSpanArea():
+            case data_models.WeatherTimespanArea():
                 self.register_weather_span_area(data)
 
     def combine(self, other_database: Self):
@@ -185,7 +185,7 @@ class WeatherDatabaseOpenMeteo:
         start_datetime: datetime.datetime,
         end_datetime: datetime.datetime,
         point_selector: PointSelector,
-    ) -> data_models.WeatherSpanArea:
+    ) -> data_models.WeatherTimespanArea:
         weather_collection: data_models.WeatherCollection = (
             data_models.WeatherCollection(data=[])
         )
@@ -212,4 +212,4 @@ class WeatherDatabaseOpenMeteo:
                 for weather_time_point in time_interval_dict[time_interval].values():
                     weather_collection.add(weather_time_point)
 
-        return data_models.WeatherSpanArea.from_weather_collection(weather_collection)
+        return data_models.WeatherTimespanArea.from_weather_collection(weather_collection)

@@ -9,7 +9,7 @@ logger = log_setup.get_logger(__name__, "logs/embed-test.log")
 
 
 def test_embedding():
-    parsed_data = data_models.WeatherSpanArea.from_openmeteo_json(
+    parsed_data = data_models.WeatherTimespanArea.from_openmeteo_json(
         json_responses=sample_json_responses()
     )
 

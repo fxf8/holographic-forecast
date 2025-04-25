@@ -326,7 +326,7 @@ class WeatherTimeArea:
 
 
 @dataclass
-class WeatherSpanArea:
+class WeatherTimespanArea:
     """
     Weather over a span of time in multiple points (an area). Each index is one hour apart
     """
@@ -360,7 +360,7 @@ class WeatherSpanArea:
             int((end_datetime - start_datetime).total_seconds()) // 3600 + 1
         )
 
-        new_weather_span_area: WeatherSpanArea = cls(
+        new_weather_span_area: WeatherTimespanArea = cls(
             data=[WeatherTimeArea(data=[]) for _ in range(number_of_timesteps)],
             start_datetime=start_datetime,
             end_datetime=end_datetime,

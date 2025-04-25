@@ -57,8 +57,8 @@ class OpenMeteoAreaSpanDataCollector:
         with requests.Session() as session:
             return [point.get(session).json() for point in self.points]
 
-    def get(self) -> data_models.WeatherSpanArea:
-        return data_models.WeatherSpanArea.from_openmeteo_json(
+    def get(self) -> data_models.WeatherTimespanArea:
+        return data_models.WeatherTimespanArea.from_openmeteo_json(
             json_responses=self.request()
         )
 

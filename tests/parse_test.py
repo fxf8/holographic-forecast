@@ -45,7 +45,7 @@ def sample_json_responses() -> Sequence[data_models.OpenMeteoResponseJSON]:
 def test_data_model_json_parsing():
     logger.info("Parsing data...")
 
-    parsed_data = data_models.WeatherSpanArea.from_openmeteo_json(
+    parsed_data = data_models.WeatherTimespanArea.from_openmeteo_json(
         json_responses=sample_json_responses()
     )
 

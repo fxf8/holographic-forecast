@@ -162,7 +162,7 @@ class WeatherTimeAreaEmbedder:
 
 @dataclass
 class WeatherSpanAreaEmbedder:
-    weather_span_area: data_models.WeatherSpanArea
+    weather_span_area: data_models.WeatherTimespanArea
 
     def embed_model_input(
         self,

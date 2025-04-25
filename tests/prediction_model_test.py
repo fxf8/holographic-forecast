@@ -21,7 +21,7 @@ import tests.log_setup as log_setup
 logger = log_setup.get_logger(__name__, "logs/prediction-model-test.log")
 
 
-def generate_data_sample() -> data_models.WeatherSpanArea:
+def generate_data_sample() -> data_models.WeatherTimespanArea:
     os.makedirs("example/open-meteo", exist_ok=True)
 
     json_cache_path: pathlib.Path = pathlib.Path(
@@ -75,7 +75,7 @@ def generate_data_sample() -> data_models.WeatherSpanArea:
             json.dump(response_data, f)
 
     with open(json_cache_path, "r") as f:
-        return data_models.WeatherSpanArea.from_openmeteo_json(
+        return data_models.WeatherTimespanArea.from_openmeteo_json(
             cast(list[data_models.OpenMeteoResponseJSON], json.load(f))
         )
 
