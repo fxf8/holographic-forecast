@@ -102,6 +102,12 @@ class GeographicCordinate:
                     self.longitude_deg + y_axis_degrees_delta,
                 )
 
+    def is_in_extent(self, extent: noaa_cdo_api.Extent) -> bool:
+        return (
+            extent.latitude_min <= self.latitude_deg <= extent.latitude_max
+            and extent.longitude_min <= self.longitude_deg <= extent.longitude_max
+        )
+
     def points_within_radius_radial_lines(
         self,
         radial_lines_count: int,
@@ -387,9 +393,59 @@ class WeatherTimespanArea:
         return weather_timespan_area
 
     def get_slice(
-        self, start_datetime: datetime.datetime, end_datetime: datetime.datetime
+        self,
+        start_datetime: datetime.datetime,
+        end_datetime: datetime.datetime | None = None,
+        extent: noaa_cdo_api.Extent | None = None,
     ):
-        return sum(
+        if end_datetime is None:
+            end_datetime = start_datetime + datetime.timedelta(hours=1)
+
+        unfiltered_weather_time_area = sum(
             self.data[P.Interval(start_datetime, end_datetime)].values(),
             WeatherTimeArea(data=[]),
         )
+
+        if extent is None:
+            return unfiltered_weather_time_area
+
+        filtered_weather_time_area: WeatherTimeArea = WeatherTimeArea(data=[])
+
+        for weather_time_point in unfiltered_weather_time_area:
+            if weather_time_point.cordinate.is_in_extent(extent):
+                filtered_weather_time_area.data.append(weather_time_point)
+
+        return filtered_weather_time_area
+
+    def get_sub_weather_timespan_area(
+        self,
+        *,
+        start_datetime: datetime.datetime,
+        time_interval: datetime.timedelta | None = None,
+        end_datetime: datetime.datetime | None = None,
+        extent: noaa_cdo_api.Extent | None = None,
+    ):
+        if time_interval is None:
+            time_interval = datetime.timedelta(hours=1)
+
+        if end_datetime is None:
+            end_datetime = start_datetime + time_interval
+
+        # Use get_slice
+
+        sub_weather_timespan_area: WeatherTimespanArea = WeatherTimespanArea(
+            data=P.IntervalDict()
+        )
+
+        current_date: datetime.datetime = start_datetime
+
+        while current_date < end_datetime:
+            sub_weather_timespan_area.data[current_date] = self.get_slice(
+                start_datetime=current_date,
+                end_datetime=current_date + time_interval,
+                extent=extent,
+            )
+
+            current_date += time_interval
+
+        return sub_weather_timespan_area

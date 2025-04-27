@@ -24,7 +24,7 @@ class WeatherTimePointEmbedder:
             data_models.WeatherQuantity, Callable[[float | str], SupportsFloat]
         ]
         | None = None,
-        additional_parameter_for_missing_values: bool = True, # If true, this will add an additional parameter for whether or not a value is present
+        additional_parameter_for_missing_values: bool = True,  # If true, this will add an additional parameter for whether or not a value is present
     ) -> tuple[npt.NDArray[np.float32], int]:  # shape (n_features,), output_dimension
         if parameter_to_float is None:
             parameter_to_float = {}
@@ -47,14 +47,14 @@ class WeatherTimePointEmbedder:
             output_dimension, dtype=np.float32
         )
 
-        existing_data: Sequence[tuple[data_models.WeatherQuantity, float | str]] = [
+        existing_data: Sequence[data_models.WeatherEntry] = [
             *self.weather_time_point.data
         ]
 
         existing_quantities_and_index: Mapping[data_models.WeatherQuantity, int] = {
-            quantity[0]: index
-            for index, quantity in enumerate(self.weather_time_point.data)
-            if quantity in existing_data
+            entry.quantity: index
+            for index, entry in enumerate(self.weather_time_point.data)
+            if entry in existing_data
         }
 
         if additional_parameter_for_missing_values:
@@ -75,7 +75,6 @@ class WeatherTimePointEmbedder:
             [
                 self.weather_time_point.cordinate.latitude_deg,
                 self.weather_time_point.cordinate.longitude_deg,
-                self.weather_time_point.elevation_meters,
             ]
         )
 
@@ -162,7 +161,7 @@ class WeatherTimeAreaEmbedder:
 
 @dataclass
 class WeatherSpanAreaEmbedder:
-    weather_span_area: data_models.WeatherTimespanArea
+    weather_timespan_area: data_models.WeatherTimespanArea
 
     def embed_model_input(
         self,
@@ -188,7 +187,7 @@ class WeatherSpanAreaEmbedder:
             tf.Tensor: The embedded tensor. Axis: (batch_size, timesteps, n_points_per_area, n_features) Each batch is a different cordinate within the cordinates within the area whose data is provided
         """
 
-        if len(self.weather_span_area.data) == 0:
+        if len(self.weather_timespan_area.data) == 0:
             raise ValueError("The weather span area is empty.")
 
         if isinstance(predicted_cordinates, data_models.GeographicCordinate):
@@ -200,14 +199,17 @@ class WeatherSpanAreaEmbedder:
                 [
                     [
                         WeatherTimeAreaEmbedder(
-                            weather_time_area
+                            sum(
+                                weather_time_area,
+                                data_models.WeatherTimeArea(data=[]),
+                            )
                         ).embed_to_numpy_2D_array(
                             predicted_cordinate=predicted_cordinate,
                             ordering=ordering,
                             parameter_to_float=parameter_to_float,
                             additional_parameter_for_missing_values=True,
                         )
-                        for weather_time_area in self.weather_span_area
+                        for weather_time_area in self.weather_timespan_area.data.values()
                     ]
                     for predicted_cordinate in predicted_cordinates
                 ]
