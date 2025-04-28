@@ -188,7 +188,7 @@ class WeatherQuantity:
 @dataclass
 class WeatherEntry:
     quantity: WeatherQuantity
-    value: float | str
+    value: float | int
 
 
 @dataclass
