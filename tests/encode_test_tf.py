@@ -1,7 +1,7 @@
 import pathlib
 
 import holographic_forecast.data.data_models as data_models
-import holographic_forecast.data.data_encoding as data_encoding
+import holographic_forecast.data.data_encoding_tf as data_encoding_tf
 
 import tests.log_setup as log_setup
 
@@ -26,7 +26,7 @@ def test_data_model_json_parsing():
     logger.info(f"Done parsing data. Data info:\n{len(parsed_data.data) = }\n")
 
     encoded_tensor = (
-        data_encoding.WeatherModelV1Encoder.encode_weather_timespan_area_to_tensor(
+        data_encoding_tf.WeatherEncoderV1.encode_weather_timespan_area_to_tensor(
             weather_timespan_area=parsed_data,
             predicted_cordinate=data_models.GeographicCordinate(
                 latitude_deg=36.1716, longitude_deg=115.1391
