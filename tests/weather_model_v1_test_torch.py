@@ -45,3 +45,7 @@ def test_model_v1():
     output = model(query)
 
     logger.info(f"Done encoding data. Data info:\n{output = }\n")
+
+
+if __name__ == "__main__":
+    test_model_v1()

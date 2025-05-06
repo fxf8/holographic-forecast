@@ -19,9 +19,7 @@ class WeatherQuantityEncodingV1:
 
     data: torch.Tensor  # shape (n features of int)
 
-    intermediate: torch.Tensor | None = (
-        None  # intermediate value for model computations
-    )
+    meaning: torch.Tensor | None = None  # intermediate value for model computations
 
     dtype: ClassVar[torch.dtype] = torch.int
 
@@ -54,6 +52,8 @@ class WeatherEntryEncodingV1:
     weather_quantity: WeatherQuantityEncodingV1
     data: torch.Tensor  # shape ()
 
+    meaning: torch.Tensor | None = None  # intermediate value for model computations
+
     dtype: ClassVar[torch.dtype] = torch.float32
 
 
@@ -61,7 +61,7 @@ class WeatherEntryEncodingV1:
 class WeatherTimePointEncodingV1:
     def __init__(self, weather_time_point: data_models.WeatherTimePoint):
         self.timestamp = torch.tensor(
-            weather_time_point.time.timestamp(),
+            [weather_time_point.time.timestamp()],
             dtype=WeatherTimePointEncodingV1.dtype,
         )
         self.cordinate = GeographicCordinateEncodingV1(weather_time_point.cordinate)
@@ -69,13 +69,11 @@ class WeatherTimePointEncodingV1:
             WeatherEntryEncodingV1(entry) for entry in weather_time_point.data
         ]
 
-    timestamp: torch.Tensor  # shape ()
+    timestamp: torch.Tensor  # shape (1)
     cordinate: GeographicCordinateEncodingV1
     weather_entries: list[WeatherEntryEncodingV1]
 
-    intermediate: torch.Tensor | None = (
-        None  # intermediate value for model computations
-    )
+    meaning: torch.Tensor | None = None  # intermediate value for model computations
 
     dtype: ClassVar[torch.dtype] = torch.float32
 
@@ -90,9 +88,7 @@ class WeatherTimeAreaEncodingV1:
 
     weather_time_points: list[WeatherTimePointEncodingV1]
 
-    intermediate: torch.Tensor | None = (
-        None  # intermediate value for model computations
-    )
+    meaning: torch.Tensor | None = None  # intermediate value for model computations
 
     dtype: ClassVar[torch.dtype] = torch.float32
 
@@ -114,7 +110,7 @@ class WeatherTimespanAreaEncodingV1:
 class QueryInfoEncodingV1:
     weather_quantity: WeatherQuantityEncodingV1
     cordinate: GeographicCordinateEncodingV1
-    timestamp: torch.Tensor  # shape ()
+    timestamp: torch.Tensor  # shape (1)
 
     def __init__(
         self,
@@ -124,7 +120,9 @@ class QueryInfoEncodingV1:
     ):
         self.weather_quantity = WeatherQuantityEncodingV1(weather_quantity)
         self.cordinate = GeographicCordinateEncodingV1(cordinate)
-        self.timestamp = torch.tensor(timestamp, dtype=QueryInfoEncodingV1.dtype)
+        self.timestamp = torch.tensor([timestamp], dtype=QueryInfoEncodingV1.dtype)
+
+    meaning: torch.Tensor | None = None  # intermediate value for model computations
 
     dtype: ClassVar[torch.dtype] = torch.float32
 
