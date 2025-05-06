@@ -7,14 +7,14 @@ import torch.nn as nn
 import holographic_forecast.data.data_encoding_torch as encoding
 
 
-class QuantityMeaningV1(nn.Module):
+class QuantityInterpreterV1(nn.Module):
     char_embedding: nn.Embedding
     linear_combiner: nn.Parameter
     embedding_dim: int
     final_dim: int
 
     def __init__(self, embedding_dim: int, final_dim: int):
-        super(QuantityMeaningV1, self).__init__()
+        super(QuantityInterpreterV1, self).__init__()
 
         self.embedding_dim = embedding_dim
         self.final_dim = final_dim
@@ -36,7 +36,7 @@ class QuantityMeaningV1(nn.Module):
 
 
 class WeatherModelV1(nn.Module):
-    quantity_meaning: QuantityMeaningV1
+    quantity_meaning: QuantityInterpreterV1
     final_dim: ClassVar[int] = 16
 
     entries_meta_reducer: nn.Linear
@@ -52,7 +52,7 @@ class WeatherModelV1(nn.Module):
     def __init__(self):
         super(WeatherModelV1, self).__init__()
 
-        self.quantity_meaning = QuantityMeaningV1(
+        self.quantity_meaning = QuantityInterpreterV1(
             embedding_dim=16, final_dim=self.final_dim
         )
         self.entries_meta_reducer = nn.Linear(

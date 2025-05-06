@@ -61,7 +61,7 @@ class WeatherEntryEncodingV1:
 class WeatherTimePointEncodingV1:
     def __init__(self, weather_time_point: data_models.WeatherTimePoint):
         self.timestamp = torch.tensor(
-            [weather_time_point.time.timestamp()],
+            weather_time_point.time.timestamp(),
             dtype=WeatherTimePointEncodingV1.dtype,
         )
         self.cordinate = GeographicCordinateEncodingV1(weather_time_point.cordinate)
@@ -115,6 +115,16 @@ class QueryInfoEncodingV1:
     weather_quantity: WeatherQuantityEncodingV1
     cordinate: GeographicCordinateEncodingV1
     timestamp: torch.Tensor  # shape ()
+
+    def __init__(
+        self,
+        weather_quantity: data_models.WeatherQuantity,
+        cordinate: data_models.GeographicCordinate,
+        timestamp: float,
+    ):
+        self.weather_quantity = WeatherQuantityEncodingV1(weather_quantity)
+        self.cordinate = GeographicCordinateEncodingV1(cordinate)
+        self.timestamp = torch.tensor(timestamp, dtype=QueryInfoEncodingV1.dtype)
 
     dtype: ClassVar[torch.dtype] = torch.float32
 
