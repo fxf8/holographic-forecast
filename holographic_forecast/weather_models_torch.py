@@ -1,6 +1,6 @@
 # pyright: reportUnknownMemberType=false
 
-from typing import override, cast, ClassVar
+from typing import override, cast
 import torch
 import torch.nn as nn
 
@@ -35,17 +35,17 @@ class QuantityInterpreterV1(nn.Module):
         )
 
     @override
-    def forward(self, query: encoding.WeatherQuantityEncodingV1) -> torch.Tensor:
+    def forward(self, quantity: encoding.WeatherQuantityEncodingV1) -> torch.Tensor:
         """
         Computes the meaning of a quantity
 
         Returns shape: (quantity_meaning_dim,)
         """
 
-        embedded_query = cast(torch.Tensor, self.char_embedding(query.data))
+        embedded_quantity = cast(torch.Tensor, self.char_embedding(quantity.data))
 
         return cast(
-            torch.Tensor, self.quantity_processor(torch.einsum("rc->c", embedded_query))
+            torch.Tensor, self.quantity_processor(torch.mean(embedded_quantity, dim=0))
         )
 
 
@@ -128,9 +128,9 @@ class WeatherTimePointInterpreterV1(nn.Module):
     entry_interpreter: EntryInterpreterV1
     query_interpreter: QueryInfoInterpreterV1
 
-    query_meaning_dim: int
-    quantity_meaning_dim: int
     weather_time_point_meaning_dim: int
+
+    weather_time_point_processor: nn.Linear
 
     def __init__(
         self,
@@ -143,11 +143,16 @@ class WeatherTimePointInterpreterV1(nn.Module):
         self.entry_interpreter = entry_interpreter
         self.query_interpreter = query_interpreter
 
-        self.query_meaning_dim = query_interpreter.query_meaning_dim
-        self.quantity_meaning_dim = (
-            entry_interpreter.quantity_interpreter.quantity_meaning_dim
-        )
         self.weather_time_point_meaning_dim = weather_time_point_meaning_dim
+
+        self.weather_time_point_processor = nn.Linear(
+            in_features=(
+                self.entry_interpreter.entry_meaning_dim
+                + self.query_interpreter.query_meaning_dim
+                + 3  # longitude, latitude, timestamp
+            ),
+            out_features=self.weather_time_point_meaning_dim,
+        )
 
     @override
     def forward(
@@ -183,19 +188,17 @@ class WeatherTimePointInterpreterV1(nn.Module):
 
         return cast(
             torch.Tensor,
-            self.entry_interpreter(
-                torch.einsum(
-                    "rc->c",
-                    (
-                        torch.cat(
-                            (
-                                stacked_weather_entries,
-                                expanded_query_meaning,
-                                expanded_weather_time_point_meta,
-                            ),
-                            dim=1,
-                        )
+            self.weather_time_point_processor(
+                torch.mean(
+                    torch.cat(
+                        (
+                            stacked_weather_entries,
+                            expanded_query_meaning,
+                            expanded_weather_time_point_meta,
+                        ),
+                        dim=1,
                     ),
+                    dim=0,
                 )
             ),
         )
@@ -217,7 +220,7 @@ class WeatherTimeAreaInterpreterV1(nn.Module):
         self.weather_time_area_meaning_dim = weather_time_area_meaning_dim
 
         self.weather_time_area_processor = nn.Linear(
-            in_features=self.weather_time_area_meaning_dim,
+            in_features=self.weather_time_point_interpreter.weather_time_point_meaning_dim,
             out_features=self.weather_time_area_meaning_dim,
         )
 
@@ -231,18 +234,21 @@ class WeatherTimeAreaInterpreterV1(nn.Module):
         Returns shape: (weather_time_area_meaning_dim,)
         """
 
-        return cast(
-            torch.Tensor,
-            self.weather_time_area_processor(
-                torch.stack(
-                    [
-                        self.weather_time_point_interpreter(
-                            weather_time_point, query_meaning
-                        )
-                        for weather_time_point in weather_time_area.weather_time_points
-                    ]
-                )
+        return torch.mean(
+            cast(
+                torch.Tensor,
+                self.weather_time_area_processor(
+                    torch.stack(
+                        [
+                            x := self.weather_time_point_interpreter(
+                                weather_time_point, query_meaning
+                            )
+                            for weather_time_point in weather_time_area.weather_time_points
+                        ]
+                    )
+                ),
             ),
+            dim=0,
         )
 
 
@@ -262,7 +268,7 @@ class WeatherTimespanInterpreterV1(nn.Module):
         self.weather_timespan_meaning_dim = weather_timespan_meaning_dim
 
         self.weather_timespan_processor = nn.Linear(
-            in_features=self.weather_timespan_meaning_dim,
+            in_features=self.weather_time_area_interpreter.weather_time_area_meaning_dim,
             out_features=self.weather_timespan_meaning_dim,
         )
 
@@ -276,18 +282,21 @@ class WeatherTimespanInterpreterV1(nn.Module):
         Returns shape: (weather_timespan_meaning_dim,)
         """
 
-        return cast(
-            torch.Tensor,
-            self.weather_timespan_processor(
-                torch.stack(
-                    [
-                        self.weather_time_area_interpreter(
-                            weather_time_area, query_meaning
-                        )
-                        for weather_time_area in weather_timespan_area.weather_time_areas
-                    ]
-                )
+        return torch.mean(
+            cast(
+                torch.Tensor,
+                self.weather_timespan_processor(
+                    torch.stack(
+                        [
+                            self.weather_time_area_interpreter(
+                                weather_time_area, query_meaning
+                            )
+                            for weather_time_area in weather_timespan_area.weather_time_areas
+                        ]
+                    )
+                ),
             ),
+            dim=0,
         )
 
 
@@ -333,7 +342,7 @@ class WeatherModelV1(nn.Module):
 
     @override
     def forward(self, query: encoding.QueryEncodingV1) -> torch.Tensor:
-        query_meaning: torch.Tensor = self.query_interpreter(query)
+        query_meaning: torch.Tensor = self.query_interpreter(query.query_info)
 
         weather_timespan_area_meaning: torch.Tensor = self.weather_timespan_interpreter(
             query.weather_timespan_area, query_meaning
